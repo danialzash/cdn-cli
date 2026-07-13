@@ -15,15 +15,58 @@ This is **v0.1.0** — a small, extensible foundation focused on read-only opera
 
 ## Requirements
 
-- Go 1.22+
 - A VergeCloud CDN API key
+
+For building from source: Go 1.22+
 
 ## Installation
 
-### From source
+### Install script (recommended)
+
+No runtime dependencies — downloads a pre-built binary from GitHub Releases.
+
+**Linux / macOS:**
 
 ```bash
-git clone <repository-url>
+curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
+```
+
+Install to a custom directory:
+
+```bash
+INSTALL_DIR=~/bin curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
+```
+
+Then authenticate:
+
+```bash
+verge version
+verge auth login --api-key <your-api-key>
+```
+
+### Manual download
+
+Download the archive for your platform from [GitHub Releases](https://github.com/danialzash/cdn-cli/releases):
+
+| Platform | Archive |
+|----------|---------|
+| Linux (amd64) | `verge_linux_amd64.tar.gz` |
+| Linux (arm64) | `verge_linux_arm64.tar.gz` |
+| macOS (Apple Silicon) | `verge_darwin_arm64.tar.gz` |
+| macOS (Intel) | `verge_darwin_amd64.tar.gz` |
+| Windows (amd64) | `verge_windows_amd64.zip` |
+
+```bash
+# Linux example
+curl -LO https://github.com/danialzash/cdn-cli/releases/latest/download/verge_linux_amd64.tar.gz
+tar -xzf verge_linux_amd64.tar.gz
+sudo mv verge /usr/local/bin/   # or mv verge ~/bin/
+```
+
+### From source (developers)
+
+```bash
+git clone https://github.com/danialzash/cdn-cli.git
 cd cdn-cli
 make build
 ./bin/verge version
@@ -50,6 +93,23 @@ cp bin/verge ~/bin/verge
 ```
 
 Ensure `~/bin` is on your `PATH` (for example, `export PATH="$HOME/bin:$PATH"` in `~/.bashrc`).
+
+## Publishing a release (maintainers)
+
+1. Commit your changes and push to `main`.
+2. Tag a version:
+   ```bash
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
+3. GitHub Actions runs GoReleaser and publishes binaries to [GitHub Releases](https://github.com/danialzash/cdn-cli/releases).
+
+To test the release build locally:
+
+```bash
+make release-snapshot
+ls dist/
+```
 
 ## Shell completion
 
@@ -211,10 +271,11 @@ internal/transport/  HTTP client with timeout, retries, User-Agent
 ## Development
 
 ```bash
-make build    # Build binary to bin/verge
-make test     # Run tests
-make lint     # Run golangci-lint (if installed)
-make generate # Generate SDK from OpenAPI spec (optional)
+make build            # Build binary to bin/verge
+make test             # Run tests
+make lint             # Run golangci-lint (if installed)
+make generate         # Generate SDK from OpenAPI spec (optional)
+make release-snapshot # Test GoReleaser build locally (outputs to dist/)
 ```
 
 ## Extending

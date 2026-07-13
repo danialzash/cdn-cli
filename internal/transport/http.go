@@ -6,13 +6,14 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/vergecloud/cdn-cli/internal/version"
 )
 
 const (
-	DefaultTimeout   = 30 * time.Second
-	DefaultUserAgent = "vergecloud-cli/0.1.0"
-	MaxRetries       = 3
-	RetryBackoff     = 500 * time.Millisecond
+	DefaultTimeout = 30 * time.Second
+	MaxRetries     = 3
+	RetryBackoff   = 500 * time.Millisecond
 )
 
 type Options struct {
@@ -26,7 +27,7 @@ func NewHTTPClient(opts Options) *http.Client {
 		opts.Timeout = DefaultTimeout
 	}
 	if opts.UserAgent == "" {
-		opts.UserAgent = DefaultUserAgent
+		opts.UserAgent = version.UserAgent
 	}
 
 	transport := &retryTransport{

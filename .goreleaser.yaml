@@ -1,0 +1,64 @@
+version: 2
+
+project_name: verge
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: verge
+    main: ./cmd/verge
+    binary: verge
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X github.com/vergecloud/cdn-cli/internal/version.Version={{.Version}}
+      - -X github.com/vergecloud/cdn-cli/internal/version.UserAgent=vergecloud-cli/{{.Version}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+      - LICENSE
+      - examples/config.yaml
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  github:
+    owner: danialzash
+    name: cdn-cli
+  draft: false
+  prerelease: auto
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"

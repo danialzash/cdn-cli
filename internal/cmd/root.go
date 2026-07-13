@@ -9,9 +9,8 @@ import (
 	"github.com/vergecloud/cdn-cli/internal/client"
 	"github.com/vergecloud/cdn-cli/internal/config"
 	"github.com/vergecloud/cdn-cli/internal/output"
+	"github.com/vergecloud/cdn-cli/internal/version"
 )
-
-const version = "0.1.0"
 
 var (
 	jsonOutput bool
@@ -49,7 +48,7 @@ func newVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print CLI version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("vergecloud-cli/%s\n", version)
+			fmt.Printf("vergecloud-cli/%s\n", version.Version)
 		},
 	}
 }
