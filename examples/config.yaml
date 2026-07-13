@@ -1,0 +1,5 @@
+# VergeCloud CDN CLI example configuration
+# Copy to ~/.config/vergecloud/config.yaml or use `verge auth login --api-key <key>`
+
+api_key: "vc_your_api_key_here"
+api_url: "https://api.vergecloud.dev/cdn"
