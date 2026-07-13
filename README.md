@@ -41,6 +41,63 @@ make install
 go build -o verge ./cmd/verge
 ```
 
+### Install to `~/bin`
+
+```bash
+make build
+mkdir -p ~/bin
+cp bin/verge ~/bin/verge
+```
+
+Ensure `~/bin` is on your `PATH` (for example, `export PATH="$HOME/bin:$PATH"` in `~/.bashrc`).
+
+## Shell completion
+
+The CLI includes tab completion via Cobra's built-in `completion` command. It completes commands, subcommands, and flags (not dynamic values like domain names).
+
+**Requirements:** the `bash-completion` package (Ubuntu/Debian: `sudo apt install bash-completion`).
+
+### Bash (recommended)
+
+Create the completions directory first, then install the script:
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions
+verge completion bash > ~/.local/share/bash-completion/completions/verge
+```
+
+Open a new terminal, then test:
+
+```bash
+verge <Tab>
+verge domains <Tab>
+verge auth login --<Tab>
+```
+
+To load completion in the **current session only**:
+
+```bash
+source <(verge completion bash)
+```
+
+### Zsh
+
+```bash
+verge completion zsh > "${fpath[1]}/_verge"
+```
+
+### Fish
+
+```bash
+verge completion fish > ~/.config/fish/completions/verge.fish
+```
+
+### Troubleshooting
+
+- **"No such file or directory"** when redirecting output: run `mkdir -p` on the target directory first (the `>` redirect does not create parent folders).
+- **Permission denied** writing to `/etc/bash_completion.d/`: use the user-local path above instead of a system path.
+- **Wrong command runs on Tab**: ensure `verge` resolves to the CLI binary (`type verge` should show `/home/you/bin/verge`, not a shell alias).
+
 ## Quick start
 
 ### 1. Authenticate
