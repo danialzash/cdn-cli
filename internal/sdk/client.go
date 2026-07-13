@@ -160,7 +160,7 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 
 func (c *Client) setAuth(req *http.Request) {
 	if c.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		req.Header.Set("X-API-Key", c.apiKey)
 	}
 	req.Header.Set("Accept", "application/json")
 }

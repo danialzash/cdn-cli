@@ -6,7 +6,7 @@ This is **v0.1.0** — a small, extensible foundation focused on read-only opera
 
 ## Features
 
-- Bearer token authentication with local config storage
+- API key authentication via `X-API-Key` header with local config storage
 - Domain listing and details
 - WAF package catalog and domain-specific packages
 - Firewall rule listing (read-only)
