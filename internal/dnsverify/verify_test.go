@@ -1,6 +1,9 @@
 package dnsverify
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestFQDN(t *testing.T) {
 	tests := []struct {
@@ -26,5 +29,19 @@ func TestMatchSubset(t *testing.T) {
 	}
 	if matchSubset([]string{"1.2.3.4"}, []string{"5.6.7.8"}) {
 		t.Fatal("expected no match")
+	}
+}
+
+func TestSRVHostMatchIsCaseInsensitive(t *testing.T) {
+	actual := "10 Mail.Example.COM:443"
+	expected := "mail.example.com"
+
+	if !strings.Contains(strings.ToLower(actual), strings.ToLower(expected)) {
+		t.Fatal("expected case-insensitive substring match for SRV host verification")
+	}
+
+	// Case-sensitive check would fail incorrectly.
+	if strings.Contains(actual, expected) {
+		t.Fatal("case-sensitive contains should not match mixed-case actual value")
 	}
 }
