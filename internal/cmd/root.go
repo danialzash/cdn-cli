@@ -37,6 +37,7 @@ func NewRootCmd() *cobra.Command {
 		newWafCmd(),
 		newFirewallCmd(),
 		newTroubleshootCmd(),
+		newDNSCmd(),
 		newVersionCmd(),
 	)
 

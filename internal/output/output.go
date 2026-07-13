@@ -166,6 +166,129 @@ func (p *Printer) PrintAuthStatus(authenticated bool, apiURL string) error {
 	return nil
 }
 
+func (p *Printer) PrintDNSRecords(records []client.DNSRecord) error {
+	if p.JSON {
+		return p.PrintJSON(records)
+	}
+
+	table := p.newTable([]string{"ID", "NAME", "TYPE", "TTL", "CLOUD", "VALUE", "PROTECTED"})
+	for _, record := range records {
+		cloud := "no"
+		if record.Cloud {
+			cloud = "yes"
+		}
+		protected := "no"
+		if record.IsProtected {
+			protected = "yes"
+		}
+		value := record.Value
+		table.Append([]string{
+			record.ID,
+			record.Name,
+			record.Type,
+			fmt.Sprintf("%d", record.TTL),
+			cloud,
+			value,
+			protected,
+		})
+	}
+	table.Render()
+	return nil
+}
+
+func (p *Printer) PrintDNSRecord(record *client.DNSRecord) error {
+	if p.JSON {
+		return p.PrintJSON(record)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("DNS Record"))
+	table := p.newTable([]string{"FIELD", "VALUE"})
+	table.Append([]string{"ID", record.ID})
+	table.Append([]string{"Name", record.Name})
+	table.Append([]string{"Type", record.Type})
+	table.Append([]string{"TTL", fmt.Sprintf("%d", record.TTL)})
+	table.Append([]string{"Cloud", boolLabel(record.Cloud)})
+	table.Append([]string{"Value", record.Value})
+	table.Append([]string{"Protected", boolLabel(record.IsProtected)})
+	if len(record.Usage) > 0 {
+		table.Append([]string{"Usage", strings.Join(record.Usage, ", ")})
+	}
+	if record.CreatedAt != "" {
+		table.Append([]string{"Created", record.CreatedAt})
+	}
+	if record.UpdatedAt != "" {
+		table.Append([]string{"Updated", record.UpdatedAt})
+	}
+	table.Render()
+	return nil
+}
+
+func (p *Printer) PrintDNSVerifyResults(results []client.DNSVerifyResult) error {
+	if p.JSON {
+		return p.PrintJSON(results)
+	}
+
+	okCount, issueCount := 0, 0
+	for _, result := range results {
+		switch result.Status {
+		case "ok":
+			okCount++
+		case "skipped":
+			// not counted as issue
+		default:
+			issueCount++
+		}
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("DNS Verification"))
+	fmt.Fprintf(p.Out, "%s %s  %s %s\n\n",
+		okStyle.Render(fmt.Sprintf("%d ok", okCount)),
+		mutedStyle.Render("·"),
+		warnStyle.Render(fmt.Sprintf("%d issues", issueCount)),
+		mutedStyle.Render("found"),
+	)
+
+	table := p.newTable([]string{"NAME", "TYPE", "STATUS", "EXPECTED", "ACTUAL", "DETAIL"})
+	for _, result := range results {
+		status := result.Status
+		switch result.Status {
+		case "ok":
+			status = okStyle.Render("ok")
+		case "skipped":
+			status = mutedStyle.Render("skipped")
+		case "mismatch", "not_found", "error":
+			status = warnStyle.Render(result.Status)
+		}
+
+		expected := result.Expected
+		actual := result.Actual
+		if len(expected) > 50 {
+			expected = expected[:47] + "..."
+		}
+		if len(actual) > 50 {
+			actual = actual[:47] + "..."
+		}
+
+		table.Append([]string{
+			result.Name,
+			result.Type,
+			status,
+			expected,
+			actual,
+			result.Detail,
+		})
+	}
+	table.Render()
+	return nil
+}
+
+func boolLabel(value bool) string {
+	if value {
+		return "yes"
+	}
+	return "no"
+}
+
 func (p *Printer) PrintMessage(msg string) {
 	if p.JSON {
 		_ = p.PrintJSON(map[string]string{"message": msg})

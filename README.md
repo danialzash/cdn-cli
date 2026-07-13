@@ -8,6 +8,7 @@ This is **v0.1.0** — a small, extensible foundation focused on read-only opera
 
 - API key authentication via `X-API-Key` header with local config storage
 - Domain listing and details
+- DNS record listing, creation, and live DNS verification
 - WAF package catalog and domain-specific packages
 - Firewall rule listing (read-only)
 - Smart Check troubleshooting with human-friendly output
@@ -219,7 +220,38 @@ verge waf packages --domain example.com
 verge firewall list example.com
 ```
 
-### 7. Run smart check
+### 7. Manage DNS records
+
+List all records with full values:
+
+```bash
+verge dns list example.com
+verge dns list example.com --type a
+```
+
+Get a single record:
+
+```bash
+verge dns get example.com <record-id>
+```
+
+Add a record:
+
+```bash
+verge dns add example.com --type a --name www --value 198.51.100.42 --ttl 300
+verge dns add example.com --type cname --name blog --value target.example.com
+verge dns add example.com --type txt --name _dmarc --value "v=DMARC1; p=none"
+verge dns add example.com --type mx --name @ --value mail.example.com --priority 10
+```
+
+Verify records against live DNS (like `dig`):
+
+```bash
+verge dns verify example.com
+verge dns verify example.com --record-id <record-id>
+```
+
+### 8. Run smart check
 
 ```bash
 verge troubleshoot smartcheck example.com
@@ -258,6 +290,11 @@ verge domains get <domain-id-or-name>
 verge waf packages [--domain <domain>]
 
 verge firewall list <domain-id>
+
+verge dns list <domain>
+verge dns get <domain> <record-id>
+verge dns add <domain> --type <type> --name <name> --value <value>
+verge dns verify <domain> [--record-id <id>]
 
 verge troubleshoot smartcheck <domain-id>
 ```
