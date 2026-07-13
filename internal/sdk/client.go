@@ -47,13 +47,22 @@ func New(opts Options) *Client {
 	}
 }
 
-func (c *Client) ListDomains(ctx context.Context, page, perPage int) (*DomainsListResponse, error) {
+func (c *Client) ListDomains(ctx context.Context, params ListDomainsParams) (*DomainsListResponse, error) {
 	query := url.Values{}
-	if page > 0 {
-		query.Set("page", strconv.Itoa(page))
+	if params.Page > 0 {
+		query.Set("page", strconv.Itoa(params.Page))
 	}
-	if perPage > 0 {
-		query.Set("per_page", strconv.Itoa(perPage))
+	if params.PerPage > 0 {
+		query.Set("per_page", strconv.Itoa(params.PerPage))
+	}
+	for _, status := range params.Statuses {
+		query.Add("statuses", status)
+	}
+	if params.SortBy != "" {
+		query.Set("sort_by", params.SortBy)
+	}
+	if params.Order != "" {
+		query.Set("order", params.Order)
 	}
 
 	var resp DomainsListResponse
@@ -167,7 +176,7 @@ func (c *Client) setAuth(req *http.Request) {
 
 // Ping validates credentials by fetching the first page of domains.
 func (c *Client) Ping(ctx context.Context) error {
-	_, err := c.ListDomains(ctx, 1, 1)
+	_, err := c.ListDomains(ctx, ListDomainsParams{Page: 1, PerPage: 1})
 	return err
 }
 

@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/vergecloud/cdn-cli/internal/sdk"
 	"github.com/vergecloud/cdn-cli/internal/transport"
@@ -12,11 +13,20 @@ const defaultPerPage = 50
 
 // Domain is the stable type used by CLI commands.
 type Domain struct {
-	ID     string
-	Name   string
+	ID             string
+	Name           string
+	Status         string
+	Type           string
+	Plan           string
+	NSKeys         []string
+	OrganizationID string
+	CreatedAt      time.Time
+}
+
+type ListDomainsOptions struct {
 	Status string
-	Type   string
-	NSKeys []string
+	SortBy string
+	Order  string
 }
 
 type FirewallRule struct {
@@ -44,10 +54,10 @@ type SmartCheckItem struct {
 }
 
 type SmartCheck struct {
-	ID        string
-	CreatedAt string
-	Items     []SmartCheckItem
-	SafeCount int
+	ID         string
+	CreatedAt  string
+	Items      []SmartCheckItem
+	SafeCount  int
 	IssueCount int
 }
 
@@ -76,12 +86,23 @@ func (c *Client) Ping(ctx context.Context) error {
 	return c.sdk.Ping(ctx)
 }
 
-func (c *Client) ListDomains(ctx context.Context) ([]Domain, error) {
+func (c *Client) ListDomains(ctx context.Context, opts ListDomainsOptions) ([]Domain, error) {
+	var statuses []string
+	if opts.Status != "" {
+		statuses = []string{opts.Status}
+	}
+
 	var all []Domain
 	page := 1
 
 	for {
-		resp, err := c.sdk.ListDomains(ctx, page, defaultPerPage)
+		resp, err := c.sdk.ListDomains(ctx, sdk.ListDomainsParams{
+			Page:     page,
+			PerPage:  defaultPerPage,
+			Statuses: statuses,
+			SortBy:   opts.SortBy,
+			Order:    opts.Order,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -234,11 +255,14 @@ func (c *Client) Raw(ctx context.Context, method, path string) ([]byte, error) {
 
 func mapDomain(d sdk.Domain) Domain {
 	return Domain{
-		ID:     d.ID,
-		Name:   d.Name,
-		Status: d.Status,
-		Type:   d.Type,
-		NSKeys: d.NSKeys,
+		ID:             d.ID,
+		Name:           d.Name,
+		Status:         d.Status,
+		Type:           d.Type,
+		Plan:           d.Plan.Name,
+		NSKeys:         d.NSKeys,
+		OrganizationID: d.OrganizationID,
+		CreatedAt:      d.CreatedAt,
 	}
 }
 

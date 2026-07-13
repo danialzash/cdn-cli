@@ -3,6 +3,7 @@ package sdk
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 type APIError struct {
@@ -35,18 +36,34 @@ type PaginatedLinks struct {
 	Next *string `json:"next"`
 }
 
+type DomainPlan struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type Domain struct {
-	ID     string   `json:"id"`
-	Name   string   `json:"name"`
-	Status string   `json:"status"`
-	Type   string   `json:"type"`
-	NSKeys []string `json:"ns_keys"`
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	Status         string     `json:"status"`
+	Type           string     `json:"type"`
+	NSKeys         []string   `json:"ns_keys"`
+	CreatedAt      time.Time  `json:"created_at"`
+	OrganizationID string     `json:"account_id"`
+	Plan           DomainPlan `json:"plan"`
+}
+
+type ListDomainsParams struct {
+	Page     int
+	PerPage  int
+	Statuses []string
+	SortBy   string
+	Order    string
 }
 
 type DomainsListResponse struct {
-	Data  []Domain        `json:"data"`
-	Meta  PaginatedMeta   `json:"meta"`
-	Links PaginatedLinks  `json:"links"`
+	Data  []Domain       `json:"data"`
+	Meta  PaginatedMeta  `json:"meta"`
+	Links PaginatedLinks `json:"links"`
 }
 
 type DomainResponse struct {

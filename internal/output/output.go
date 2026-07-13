@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/olekukonko/tablewriter"
@@ -48,9 +49,21 @@ func (p *Printer) PrintDomains(domains []client.Domain) error {
 		return p.PrintJSON(domains)
 	}
 
-	table := p.newTable([]string{"ID", "NAME", "STATUS", "TYPE"})
+	table := p.newTable([]string{"ID", "NAME", "STATUS", "TYPE", "PLAN", "ORGANIZATION_ID", "CREATED"})
 	for _, d := range domains {
-		table.Append([]string{d.ID, d.Name, d.Status, d.Type})
+		created := "-"
+		if !d.CreatedAt.IsZero() {
+			created = d.CreatedAt.Format("2006-01-02 15:04")
+		}
+		table.Append([]string{
+			d.ID,
+			d.Name,
+			d.Status,
+			d.Type,
+			d.Plan,
+			d.OrganizationID,
+			created,
+		})
 	}
 	table.Render()
 	return nil
@@ -67,6 +80,15 @@ func (p *Printer) PrintDomain(d *client.Domain) error {
 	table.Append([]string{"Name", d.Name})
 	table.Append([]string{"Status", d.Status})
 	table.Append([]string{"Type", d.Type})
+	if d.Plan != "" {
+		table.Append([]string{"Plan", d.Plan})
+	}
+	if d.OrganizationID != "" {
+		table.Append([]string{"Organization ID", d.OrganizationID})
+	}
+	if !d.CreatedAt.IsZero() {
+		table.Append([]string{"Created", d.CreatedAt.Format(time.RFC3339)})
+	}
 	if len(d.NSKeys) > 0 {
 		table.Append([]string{"NS Keys", strings.Join(d.NSKeys, ", ")})
 	}

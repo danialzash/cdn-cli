@@ -223,7 +223,13 @@ verge auth status
 
 ```bash
 verge domains list
+verge domains list --status active
+verge domains list --status inactive
+verge domains list --sort-by name --order asc
+verge domains list --sort-by status --order desc
 ```
+
+The list includes plan name (for example `enterprise`), organization ID, and created date.
 
 ### 4. Get domain details
 
@@ -317,7 +323,7 @@ verge auth login --api-key <key>
 verge auth status
 verge auth logout
 
-verge domains list
+verge domains list [--status active|inactive] [--sort-by name|status|updated_at] [--order asc|desc]
 verge domains get <domain-id-or-name>
 
 verge waf packages [--domain <domain>]

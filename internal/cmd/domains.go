@@ -3,8 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/vergecloud/cdn-cli/internal/client"
 )
 
 func newDomainsCmd() *cobra.Command {
@@ -19,10 +21,24 @@ func newDomainsCmd() *cobra.Command {
 }
 
 func newDomainsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var (
+		status string
+		sortBy string
+		order  string
+	)
+
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all domains",
+		Long: `List all domains with optional filtering and sorting.
+
+Filtering uses the API statuses parameter (active or inactive).
+Sorting supports name, status, and updated_at in ascending or descending order.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			if err := validateDomainListFlags(status, sortBy, order); err != nil {
+				exitOnError(err)
+			}
+
 			cfg, err := loadRuntimeConfig()
 			exitOnError(err)
 
@@ -30,7 +46,11 @@ func newDomainsListCmd() *cobra.Command {
 			exitOnError(err)
 
 			withContext(func(ctx context.Context) error {
-				domains, err := c.ListDomains(ctx)
+				domains, err := c.ListDomains(ctx, client.ListDomainsOptions{
+					Status: status,
+					SortBy: sortBy,
+					Order:  order,
+				})
 				if err != nil {
 					return err
 				}
@@ -45,6 +65,43 @@ func newDomainsListCmd() *cobra.Command {
 			})
 		},
 	}
+
+	cmd.Flags().StringVar(&status, "status", "", "Filter by status: active or inactive")
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort by field: name, status, updated_at")
+	cmd.Flags().StringVar(&order, "order", "", "Sort order: asc or desc")
+	return cmd
+}
+
+func validateDomainListFlags(status, sortBy, order string) error {
+	if status != "" {
+		switch strings.ToLower(status) {
+		case "active", "inactive":
+		default:
+			return fmt.Errorf("invalid --status %q: use active or inactive", status)
+		}
+	}
+
+	if sortBy != "" {
+		switch strings.ToLower(sortBy) {
+		case "name", "status", "updated_at":
+		default:
+			return fmt.Errorf("invalid --sort-by %q: use name, status, or updated_at", sortBy)
+		}
+	}
+
+	if order != "" {
+		switch strings.ToLower(order) {
+		case "asc", "desc":
+		default:
+			return fmt.Errorf("invalid --order %q: use asc or desc", order)
+		}
+	}
+
+	if order != "" && sortBy == "" {
+		return fmt.Errorf("--order requires --sort-by")
+	}
+
+	return nil
 }
 
 func newDomainsGetCmd() *cobra.Command {

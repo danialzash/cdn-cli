@@ -26,7 +26,13 @@ func TestDecodeDomainResponse(t *testing.T) {
 			"id": "11111111-1111-1111-1111-111111111111",
 			"name": "example.com",
 			"status": "active",
-			"type": "full"
+			"type": "full",
+			"account_id": "9ecb9b97-dc4c-416a-8de5-fbb59ca05924",
+			"created_at": "2026-05-19T18:51:17+00:00",
+			"plan": {
+				"id": "8e2b9441-a117-45bd-a69c-eaeceb24ff64",
+				"name": "enterprise"
+			}
 		}
 	}`
 
@@ -36,6 +42,9 @@ func TestDecodeDomainResponse(t *testing.T) {
 	}
 	if resp.Data.Name != "example.com" {
 		t.Fatalf("name = %q", resp.Data.Name)
+	}
+	if resp.Data.Plan.Name != "enterprise" {
+		t.Fatalf("plan = %q", resp.Data.Plan.Name)
 	}
 }
 
