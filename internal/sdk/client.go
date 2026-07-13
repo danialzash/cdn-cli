@@ -18,13 +18,13 @@ import (
 // The OpenAPI spec at openapi.yaml is stored for future code generation.
 type Client struct {
 	baseURL    string
-	apiKey     string
+	auth       Auth
 	httpClient *http.Client
 }
 
 type Options struct {
 	BaseURL    string
-	APIKey     string
+	Auth       Auth
 	HTTPClient *http.Client
 	Verbose    bool
 }
@@ -42,7 +42,7 @@ func New(opts Options) *Client {
 
 	return &Client{
 		baseURL:    baseURL,
-		apiKey:     opts.APIKey,
+		auth:       opts.Auth,
 		httpClient: httpClient,
 	}
 }
@@ -168,8 +168,15 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 }
 
 func (c *Client) setAuth(req *http.Request) {
-	if c.apiKey != "" {
-		req.Header.Set("X-API-Key", c.apiKey)
+	switch c.auth.Method {
+	case AuthMethodBearer:
+		if c.auth.Token != "" {
+			req.Header.Set("Authorization", "Bearer "+c.auth.Token)
+		}
+	default:
+		if c.auth.Token != "" {
+			req.Header.Set("X-API-Key", c.auth.Token)
+		}
 	}
 	req.Header.Set("Accept", "application/json")
 }

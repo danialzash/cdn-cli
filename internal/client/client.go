@@ -67,7 +67,7 @@ type Client struct {
 
 type Options struct {
 	BaseURL string
-	APIKey  string
+	Auth    sdk.Auth
 	Verbose bool
 }
 
@@ -75,7 +75,7 @@ func New(opts Options) *Client {
 	return &Client{
 		sdk: sdk.New(sdk.Options{
 			BaseURL:    opts.BaseURL,
-			APIKey:     opts.APIKey,
+			Auth:       opts.Auth,
 			HTTPClient: transport.NewHTTPClient(transport.Options{Verbose: opts.Verbose}),
 			Verbose:    opts.Verbose,
 		}),

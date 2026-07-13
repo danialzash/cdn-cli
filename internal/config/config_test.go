@@ -10,9 +10,9 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cfg := &Config{
-		APIKey: "test-key",
 		APIURL: "https://api.example.test/cdn",
 	}
+	cfg.SetAPIKey("test-key")
 	if err := Save(cfg); err != nil {
 		t.Fatalf("save config: %v", err)
 	}
@@ -57,7 +57,9 @@ func TestLoadMissingUsesDefaults(t *testing.T) {
 
 func TestClearRemovesConfig(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	if err := Save(&Config{APIKey: "x", APIURL: DefaultAPIURL}); err != nil {
+	cfg := &Config{APIURL: DefaultAPIURL}
+	cfg.SetAPIKey("x")
+	if err := Save(cfg); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 	if err := Clear(); err != nil {

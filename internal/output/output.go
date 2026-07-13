@@ -170,11 +170,12 @@ func (p *Printer) PrintSmartCheck(check *client.SmartCheck) error {
 	return nil
 }
 
-func (p *Printer) PrintAuthStatus(authenticated bool, apiURL string) error {
+func (p *Printer) PrintAuthStatus(authenticated bool, apiURL, authMethod string) error {
 	if p.JSON {
 		return p.PrintJSON(map[string]any{
 			"authenticated": authenticated,
 			"api_url":       apiURL,
+			"auth_method":   authMethod,
 		})
 	}
 
@@ -184,6 +185,7 @@ func (p *Printer) PrintAuthStatus(authenticated bool, apiURL string) error {
 	}
 	fmt.Fprintf(p.Out, "%s\n", titleStyle.Render("Auth Status"))
 	fmt.Fprintf(p.Out, "  Status:  %s\n", status)
+	fmt.Fprintf(p.Out, "  Method:  %s\n", authMethod)
 	fmt.Fprintf(p.Out, "  API URL: %s\n", apiURL)
 	return nil
 }

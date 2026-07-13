@@ -13,10 +13,11 @@ import (
 )
 
 var (
-	jsonOutput bool
-	verbose    bool
-	apiURL     string
-	apiKey     string
+	jsonOutput  bool
+	verbose     bool
+	apiURL      string
+	apiKey      string
+	bearerToken string
 )
 
 func NewRootCmd() *cobra.Command {
@@ -35,6 +36,7 @@ Configuration is stored in ~/.config/vergecloud/config.yaml.`,
 	root.PersistentFlags().BoolVar(&verbose, "verbose", false, "Enable request logging")
 	root.PersistentFlags().StringVar(&apiURL, "api-url", "", "Override API base URL")
 	root.PersistentFlags().StringVar(&apiKey, "api-key", "", "Override API key")
+	root.PersistentFlags().StringVar(&bearerToken, "token", "", "Override bearer token")
 
 	root.AddCommand(
 		newAuthCmd(),
@@ -67,8 +69,14 @@ func loadRuntimeConfig() (*config.Config, error) {
 	if apiURL != "" {
 		cfg.APIURL = apiURL
 	}
+	if apiKey != "" && bearerToken != "" {
+		return nil, fmt.Errorf("use only one credential override: --api-key or --token")
+	}
 	if apiKey != "" {
-		cfg.APIKey = apiKey
+		cfg.SetAPIKey(apiKey)
+	}
+	if bearerToken != "" {
+		cfg.SetBearerToken(bearerToken)
 	}
 	if cfg.APIURL == "" {
 		cfg.APIURL = config.DefaultAPIURL
@@ -77,12 +85,12 @@ func loadRuntimeConfig() (*config.Config, error) {
 }
 
 func newAPIClient(cfg *config.Config) (*client.Client, error) {
-	if cfg.APIKey == "" {
-		return nil, fmt.Errorf("not authenticated: run `verge auth login --api-key <key>`")
+	if !cfg.IsAuthenticated() {
+		return nil, fmt.Errorf("not authenticated: run `verge auth login --api-key <key>` or `verge auth login --token <jwt>`")
 	}
 	return client.New(client.Options{
 		BaseURL: cfg.APIURL,
-		APIKey:  cfg.APIKey,
+		Auth:    authFromConfig(cfg),
 		Verbose: verbose,
 	}), nil
 }

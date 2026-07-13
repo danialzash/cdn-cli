@@ -6,7 +6,7 @@ This is **v0.1.0** — a small, extensible foundation focused on read-only opera
 
 ## Features
 
-- API key authentication via `X-API-Key` header with local config storage
+- API key or bearer token authentication with local config storage
 - Domain listing and details
 - DNS record listing, creation, and live DNS verification
 - WAF package catalog and domain-specific packages
@@ -16,7 +16,7 @@ This is **v0.1.0** — a small, extensible foundation focused on read-only opera
 
 ## Requirements
 
-- A VergeCloud CDN API key
+- A VergeCloud CDN API key or bearer token
 
 For building from source: Go 1.22+
 
@@ -38,11 +38,14 @@ Install to a custom directory:
 INSTALL_DIR=~/bin curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
 ```
 
-Then authenticate:
+Then authenticate with either method:
 
 ```bash
-verge version
+# API key (X-API-Key header)
 verge auth login --api-key <your-api-key>
+
+# Bearer token (Authorization: Bearer header)
+verge auth login --token <your-jwt>
 ```
 
 ### Manual download
@@ -207,8 +210,12 @@ man verge
 
 ### 1. Authenticate
 
+Use an API key or bearer token (not both):
+
 ```bash
 verge auth login --api-key <your-api-key>
+# or
+verge auth login --token <your-jwt>
 ```
 
 Credentials are stored at `~/.config/vergecloud/config.yaml` with `0600` permissions.
@@ -304,13 +311,23 @@ verge troubleshoot smartcheck example.com
 | `--verbose` | Log HTTP requests to stderr |
 | `--api-url` | Override API base URL (default: `https://api.vergecloud.dev/cdn`) |
 | `--api-key` | Override stored API key for a single command |
+| `--token` | Override stored bearer token for a single command |
 
 ## Configuration
 
 Example config (`~/.config/vergecloud/config.yaml`):
 
 ```yaml
+auth_method: api_key
 api_key: "vc_your_api_key_here"
+api_url: "https://api.vergecloud.dev/cdn"
+```
+
+Or with a bearer token:
+
+```yaml
+auth_method: bearer
+bearer_token: "eyJhbGciOi..."
 api_url: "https://api.vergecloud.dev/cdn"
 ```
 
@@ -320,6 +337,7 @@ See [examples/config.yaml](examples/config.yaml).
 
 ```
 verge auth login --api-key <key>
+verge auth login --token <jwt>
 verge auth status
 verge auth logout
 

@@ -15,8 +15,10 @@ const (
 )
 
 type Config struct {
-	APIKey string `mapstructure:"api_key" yaml:"api_key"`
-	APIURL string `mapstructure:"api_url" yaml:"api_url"`
+	AuthMethod  string `mapstructure:"auth_method" yaml:"auth_method"`
+	APIKey      string `mapstructure:"api_key" yaml:"api_key,omitempty"`
+	BearerToken string `mapstructure:"bearer_token" yaml:"bearer_token,omitempty"`
+	APIURL      string `mapstructure:"api_url" yaml:"api_url"`
 }
 
 func ConfigDir() (string, error) {
@@ -60,6 +62,10 @@ func Load() (*Config, error) {
 	if cfg.APIURL == "" {
 		cfg.APIURL = DefaultAPIURL
 	}
+	cfg.NormalizeAuthMethod()
+	if err := ValidateAuthMethod(cfg.AuthMethod); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 
@@ -77,10 +83,23 @@ func Save(cfg *Config) error {
 		return err
 	}
 
+	cfg.NormalizeAuthMethod()
+	if err := ValidateAuthMethod(cfg.AuthMethod); err != nil {
+		return err
+	}
+
 	v := viper.New()
 	v.SetConfigType("yaml")
-	v.Set("api_key", cfg.APIKey)
 	v.Set("api_url", cfg.APIURL)
+	if cfg.IsAuthenticated() {
+		v.Set("auth_method", cfg.AuthMethod)
+	}
+	switch cfg.AuthMethod {
+	case AuthMethodBearer:
+		v.Set("bearer_token", cfg.BearerToken)
+	case AuthMethodAPIKey:
+		v.Set("api_key", cfg.APIKey)
+	}
 
 	if err := v.WriteConfigAs(path); err != nil {
 		return fmt.Errorf("write config: %w", err)
