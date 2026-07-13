@@ -22,7 +22,7 @@ generate:
 	oapi-codegen -generate types,client -package sdk -o internal/sdk/client.gen.go internal/sdk/openapi.yaml
 
 release-snapshot:
-	@which goreleaser >/dev/null 2>&1 || (echo "goreleaser not installed; run: go install github.com/goreleaser/goreleaser/v2@latest" && exit 1)
+	@which goreleaser >/dev/null 2>&1 || (echo "goreleaser not found. Local install is optional — push a v* tag and GitHub Actions will publish releases." && exit 1)
 	goreleaser release --snapshot --clean --skip=publish
 
 clean:

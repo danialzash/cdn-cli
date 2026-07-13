@@ -104,12 +104,23 @@ Ensure `~/bin` is on your `PATH` (for example, `export PATH="$HOME/bin:$PATH"` i
    ```
 3. GitHub Actions runs GoReleaser and publishes binaries to [GitHub Releases](https://github.com/danialzash/cdn-cli/releases).
 
-To test the release build locally:
+**You do not need GoReleaser installed locally.** Pushing the tag is enough — CI builds and publishes everything.
+
+Check progress at: `https://github.com/danialzash/cdn-cli/actions`
+
+### Optional: test release build locally
+
+Local GoReleaser is only for maintainers who want to preview `dist/` before tagging. It is **not required** to publish.
 
 ```bash
 make release-snapshot
 ls dist/
 ```
+
+If `go install github.com/goreleaser/goreleaser/v2@latest` fails on your machine, that is fine — common causes:
+
+- **Go version too old:** latest GoReleaser requires Go 1.26+, while this project uses Go 1.22. GitHub Actions uses its own Go toolchain, so releases still work.
+- **`403 Forbidden` from `proxy.golang.org`:** a network/proxy issue on your machine. Skip local install and publish via git tag instead.
 
 ## Shell completion
 
