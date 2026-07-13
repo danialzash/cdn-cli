@@ -47,7 +47,14 @@ type Domain struct {
 	Status         string     `json:"status"`
 	Type           string     `json:"type"`
 	NSKeys         []string   `json:"ns_keys"`
+	CurrentNS      []string   `json:"current_ns"`
+	CnameTarget    string     `json:"cname_target"`
+	CustomCname    string     `json:"custom_cname"`
+	DNSCloud       bool       `json:"dns_cloud"`
+	Restrictions   []string   `json:"restriction"`
+	Fingerprint    bool       `json:"fingerprint_status"`
 	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 	OrganizationID string     `json:"account_id"`
 	Plan           DomainPlan `json:"plan"`
 }

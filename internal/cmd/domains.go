@@ -16,7 +16,7 @@ func newDomainsCmd() *cobra.Command {
 		Aliases: []string{"domain"},
 	}
 
-	cmd.AddCommand(newDomainsListCmd(), newDomainsGetCmd())
+	cmd.AddCommand(newDomainsListCmd(), newDomainsGetCmd(), newDomainsInspectCmd())
 	return cmd
 }
 
@@ -132,6 +132,39 @@ func newDomainsGetCmd() *cobra.Command {
 					return fmt.Errorf("get domain %q: %w", domainID, err)
 				}
 				return printer().PrintDomain(domain)
+			})
+		},
+	}
+}
+
+func newDomainsInspectCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "inspect <domain>",
+		Aliases: []string{"overview", "super"},
+		Short:   "Fetch comprehensive domain details in parallel",
+		Long: `Load domain configuration from all major API sections concurrently.
+
+Fetches domain info, DNS records, firewall, WAF, DDoS, page rules, SSL, caching,
+load balancing, rate limiting, acceleration, and smart-check status in parallel.`,
+		Args: cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg, err := loadRuntimeConfig()
+			exitOnError(err)
+
+			c, err := newAPIClient(cfg)
+			exitOnError(err)
+
+			domain := args[0]
+
+			withContext(func(ctx context.Context) error {
+				result, err := c.InspectDomain(ctx, domain)
+				if err != nil {
+					return fmt.Errorf("inspect domain %q: %w", domain, err)
+				}
+				if jsonOutput {
+					return printer().PrintJSON(result)
+				}
+				return printer().PrintDomainInspect(result)
 			})
 		},
 	}

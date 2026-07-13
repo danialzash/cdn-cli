@@ -246,7 +246,18 @@ verge domains get example.com
 verge domains get 11111111-1111-1111-1111-111111111111
 ```
 
-### 5. List WAF packages
+### 5. Domain overview (parallel inspect)
+
+Fetch comprehensive domain details from all major API sections at once:
+
+```bash
+verge domains inspect example.com
+verge domains inspect example.com --json
+```
+
+Includes domain info, DNS, firewall, WAF, DDoS, page rules, SSL, caching, load balancing, rate limiting, acceleration, and smart-check status. All API calls run in parallel.
+
+### 6. List WAF packages
 
 Global catalog:
 
@@ -260,13 +271,13 @@ Domain-specific packages (with mode and status):
 verge waf packages --domain example.com
 ```
 
-### 6. List firewall rules
+### 7. List firewall rules
 
 ```bash
 verge firewall list example.com
 ```
 
-### 7. Manage DNS records
+### 8. Manage DNS records
 
 List all records with full values:
 
@@ -298,7 +309,7 @@ verge dns verify example.com --workers 20
 verge dns verify example.com --record-id <record-id>
 ```
 
-### 8. Run smart check
+### 9. Run smart check
 
 ```bash
 verge troubleshoot smartcheck example.com
@@ -344,6 +355,7 @@ verge auth logout
 
 verge domains list [--status active|inactive] [--sort-by name|status|updated_at] [--order asc|desc]
 verge domains get <domain-id-or-name>
+verge domains inspect <domain>
 
 verge waf packages [--domain <domain>]
 

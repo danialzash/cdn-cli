@@ -1,0 +1,160 @@
+package sdk
+
+type FirewallSettings struct {
+	IsEnabled        bool   `json:"is_enabled"`
+	DefaultAction    string `json:"default_action"`
+	VerifySNI        bool   `json:"verify_sni"`
+	SkipGlobalFW     bool   `json:"skip_global_firewall"`
+	SkipGlobalWL     bool   `json:"skip_global_whitelist"`
+}
+
+type FirewallSettingsResponse struct {
+	Data FirewallSettings `json:"data"`
+}
+
+type CacheSettings struct {
+	CacheStatus         string `json:"cache_status"`
+	CacheMaxAge         string `json:"cache_max_age"`
+	CacheDeveloperMode  bool   `json:"cache_developer_mode"`
+	CacheMaxSize        int64  `json:"cache_max_size"`
+	CacheConsistentUptime bool `json:"cache_consistent_uptime"`
+}
+
+type CacheSettingsResponse struct {
+	Data CacheSettings `json:"data"`
+}
+
+type SslSettings struct {
+	SSLStatus       bool          `json:"ssl_status"`
+	CertificateMode string        `json:"certificate_mode"`
+	TLSVersion      string        `json:"tls_version"`
+	HSTSStatus      bool          `json:"hsts_status"`
+	HTTPSRedirect   bool          `json:"https_redirect"`
+	QUICStatus      bool          `json:"quic_status"`
+	Certificates    []Certificate `json:"certificates"`
+}
+
+type Certificate struct {
+	ID          string   `json:"id"`
+	Type        string   `json:"type"`
+	Active      bool     `json:"active"`
+	DomainNames []string `json:"domain_names"`
+	Issuer      string   `json:"issuer"`
+	ExpiryDate  string   `json:"expiry_date"`
+}
+
+type SslSettingsResponse struct {
+	Data SslSettings `json:"data"`
+}
+
+type DdosSettings struct {
+	IsEnabled      bool   `json:"is_enabled"`
+	ProtectionMode string `json:"protection_mode"`
+	CaptchaService string `json:"captcha_service"`
+	TTL            int    `json:"ttl"`
+}
+
+type DdosSettingsResponse struct {
+	Data DdosSettings `json:"data"`
+}
+
+type DdosRule struct {
+	ID         string   `json:"id"`
+	URLPattern string   `json:"url_pattern"`
+	Action     string   `json:"action"`
+	IsEnabled  bool     `json:"is_enabled"`
+	Description string  `json:"description"`
+	Sources    []string `json:"sources"`
+}
+
+type DdosRulesResponse struct {
+	Data  []DdosRule     `json:"data"`
+	Meta  PaginatedMeta  `json:"meta"`
+	Links PaginatedLinks `json:"links"`
+}
+
+type PageRuleSummary struct {
+	ID          string `json:"id"`
+	Seq         int    `json:"seq"`
+	URL         string `json:"url"`
+	Status      bool   `json:"status"`
+	IsProtected bool   `json:"is_protected"`
+	CacheLevel  string `json:"cache_level"`
+}
+
+type PageRulesResponse struct {
+	Data  []PageRuleSummary `json:"data"`
+	Meta  PaginatedMeta     `json:"meta"`
+	Links PaginatedLinks    `json:"links"`
+}
+
+type LoadBalancerSetting struct {
+	Method   string `json:"method"`
+	Protocol string `json:"protocol"`
+	Keepalive string `json:"keepalive"`
+	GRPCStatus bool  `json:"grpc_status"`
+}
+
+type LoadBalancerSettingsResponse struct {
+	Data LoadBalancerSetting `json:"data"`
+}
+
+type LoadBalancer struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Status      bool   `json:"status"`
+	Method      string `json:"method"`
+	PoolCount   int    `json:"-"`
+}
+
+type LoadBalancerAPI struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Description string `json:"description"`
+	Status bool   `json:"status"`
+	Method string `json:"method"`
+	Pools  []struct {
+		ID string `json:"id"`
+	} `json:"pools"`
+}
+
+type LoadBalancersResponse struct {
+	Data  []LoadBalancerAPI `json:"data"`
+	Meta  PaginatedMeta     `json:"meta"`
+	Links PaginatedLinks    `json:"links"`
+}
+
+type RateLimitSettings struct {
+	DdosDetection  bool     `json:"ddos_detection"`
+	ExcludeSources []string `json:"exclude_sources"`
+}
+
+type RateLimitSettingsResponse struct {
+	Data RateLimitSettings `json:"data"`
+}
+
+type RateLimitRule struct {
+	ID          string `json:"id"`
+	URLPattern  string `json:"url_pattern"`
+	Action      string `json:"action"`
+	IsEnabled   bool   `json:"is_enabled"`
+	Rate        int    `json:"rate"`
+	TimeDuration int   `json:"time_duration"`
+	Description string `json:"description"`
+}
+
+type RateLimitRulesResponse struct {
+	Data  []RateLimitRule `json:"data"`
+	Meta  PaginatedMeta   `json:"meta"`
+	Links PaginatedLinks  `json:"links"`
+}
+
+type Acceleration struct {
+	Status     string   `json:"status"`
+	Extensions []string `json:"extensions"`
+}
+
+type AccelerationResponse struct {
+	Data Acceleration `json:"data"`
+}
