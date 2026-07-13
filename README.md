@@ -294,6 +294,7 @@ Verify records against live DNS (like `dig`):
 
 ```bash
 verge dns verify example.com
+verge dns verify example.com --workers 20
 verge dns verify example.com --record-id <record-id>
 ```
 
@@ -351,7 +352,7 @@ verge firewall list <domain-id>
 verge dns list <domain>
 verge dns get <domain> <record-id>
 verge dns add <domain> --type <type> --name <name> --value <value>
-verge dns verify <domain> [--record-id <id>]
+verge dns verify <domain> [--record-id <id>] [--workers 10]
 
 verge troubleshoot smartcheck <domain-id>
 ```

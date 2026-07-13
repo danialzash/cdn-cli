@@ -32,6 +32,26 @@ func TestMatchSubset(t *testing.T) {
 	}
 }
 
+func TestNormalizeIPListStripsWeightSuffix(t *testing.T) {
+	got := normalizeIPList("64.109.22.24 (w=100), 1.1.2.2 (w=100)")
+	want := []string{"64.109.22.24", "1.1.2.2"}
+	if len(got) != len(want) {
+		t.Fatalf("normalizeIPList() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("normalizeIPList()[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestNormalizeIPListIPv6WithWeight(t *testing.T) {
+	got := normalizeIPList("2001:db8:85a3::8a2e:370:7334 (w=100)")
+	if len(got) != 1 || got[0] != "2001:db8:85a3::8a2e:370:7334" {
+		t.Fatalf("normalizeIPList() = %v", got)
+	}
+}
+
 func TestSRVHostMatchIsCaseInsensitive(t *testing.T) {
 	actual := "10 Mail.Example.COM:443"
 	expected := "mail.example.com"

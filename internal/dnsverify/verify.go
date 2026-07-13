@@ -22,10 +22,6 @@ type Checker struct {
 	Resolver *net.Resolver
 }
 
-func NewChecker() *Checker {
-	return &Checker{Resolver: net.DefaultResolver}
-}
-
 func (c *Checker) Verify(ctx context.Context, recordType, name, domain, expected string, cloud bool) Result {
 	result := Result{
 		Name:     name,
@@ -82,13 +78,13 @@ func (c *Checker) verifyHost(ctx context.Context, result Result, queryName, reco
 		}
 		if wantIPv6 {
 			if parsed.To16() != nil && parsed.To4() == nil {
-				filtered = append(filtered, ip)
+				filtered = append(filtered, parsed.String())
 			}
 		} else if parsed.To4() != nil {
-			filtered = append(filtered, ip)
+			filtered = append(filtered, parsed.String())
 		}
 	}
-	sort.Strings(filtered)
+		sort.Strings(filtered)
 	result.Actual = strings.Join(filtered, ", ")
 
 	if len(filtered) == 0 {
@@ -103,7 +99,7 @@ func (c *Checker) verifyHost(ctx context.Context, result Result, queryName, reco
 		return result
 	}
 
-	expectedIPs := splitList(expected)
+	expectedIPs := normalizeIPList(expected)
 	if matchAny(expectedIPs, filtered) || matchSubset(expectedIPs, filtered) {
 		result.Status = "ok"
 		return result
@@ -306,6 +302,28 @@ func splitList(values string) []string {
 		if part != "" {
 			out = append(out, part)
 		}
+	}
+	return out
+}
+
+// normalizeIPList extracts bare IP addresses from formatted expected values such as
+// "64.109.22.24 (w=100) [US]" so they can be compared against live DNS answers.
+func normalizeIPList(values string) []string {
+	parts := splitList(values)
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if idx := strings.Index(part, " "); idx >= 0 {
+			part = part[:idx]
+		}
+		parsed := net.ParseIP(part)
+		if parsed == nil {
+			continue
+		}
+		out = append(out, parsed.String())
 	}
 	return out
 }

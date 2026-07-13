@@ -98,29 +98,75 @@ func (c *Client) CreateDNSRecord(ctx context.Context, domain string, input Creat
 	return &mapped, nil
 }
 
-func (c *Client) VerifyDNSRecords(ctx context.Context, domain string, records []DNSRecord) []DNSVerifyResult {
+func (c *Client) VerifyDNSRecords(ctx context.Context, domain string, records []DNSRecord, workers int) []DNSVerifyResult {
 	checker := dnsverify.NewChecker()
-	results := make([]DNSVerifyResult, 0, len(records))
 
-	for _, record := range records {
-		expected := record.Value
-		if expected == "" {
-			expected = formatDNSValue(record.Type, record.RawValue)
+	jobs := make([]dnsverify.VerifyJob, len(records))
+	displays := make([]string, len(records))
+	for i, record := range records {
+		displayExpected := record.Value
+		if displayExpected == "" {
+			displayExpected = formatDNSValue(record.Type, record.RawValue)
 		}
 
-		verify := checker.Verify(ctx, record.Type, record.Name, domain, expected, record.Cloud)
-		results = append(results, DNSVerifyResult{
-			RecordID: record.ID,
-			Name:     verify.Name,
-			Type:     verify.Type,
-			Expected: verify.Expected,
-			Actual:   verify.Actual,
-			Status:   verify.Status,
-			Detail:   verify.Detail,
-		})
+		verifyExpected := dnsVerifyExpected(record.Type, record.RawValue)
+		if verifyExpected == "" {
+			verifyExpected = displayExpected
+		}
+
+		displays[i] = displayExpected
+		jobs[i] = dnsverify.VerifyJob{
+			RecordID:   record.ID,
+			RecordType: record.Type,
+			Name:       record.Name,
+			Domain:     domain,
+			Expected:   verifyExpected,
+			Cloud:      record.Cloud,
+		}
+	}
+
+	verified := checker.VerifyAll(ctx, jobs, workers)
+	results := make([]DNSVerifyResult, len(verified))
+	for i, item := range verified {
+		results[i] = DNSVerifyResult{
+			RecordID: item.RecordID,
+			Name:     item.Name,
+			Type:     item.Type,
+			Expected: displays[i],
+			Actual:   item.Actual,
+			Status:   item.Status,
+			Detail:   item.Detail,
+		}
 	}
 
 	return results
+}
+
+func dnsVerifyExpected(recordType string, raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+
+	recordType = strings.ToLower(recordType)
+	switch recordType {
+	case "a", "aaaa":
+		var values []struct {
+			IP string `json:"ip"`
+		}
+		if err := json.Unmarshal(raw, &values); err != nil {
+			return ""
+		}
+		ips := make([]string, 0, len(values))
+		for _, item := range values {
+			ip := strings.TrimSpace(item.IP)
+			if ip != "" {
+				ips = append(ips, ip)
+			}
+		}
+		return strings.Join(ips, ", ")
+	default:
+		return ""
+	}
 }
 
 func mapDNSRecord(record sdk.DnsRecord) DNSRecord {

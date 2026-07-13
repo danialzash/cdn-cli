@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/vergecloud/cdn-cli/internal/client"
+	"github.com/vergecloud/cdn-cli/internal/dnsverify"
 )
 
 func newDNSCmd() *cobra.Command {
@@ -161,7 +162,10 @@ Examples:
 }
 
 func newDNSVerifyCmd() *cobra.Command {
-	var recordID string
+	var (
+		recordID string
+		workers  int
+	)
 
 	cmd := &cobra.Command{
 		Use:   "verify <domain>",
@@ -169,7 +173,7 @@ func newDNSVerifyCmd() *cobra.Command {
 		Long: `Check configured DNS records against live public DNS responses.
 
 Uses Go's DNS resolver (similar to dig) to compare expected values from the API
-with what is currently published on the internet.`,
+with what is currently published on the internet. Lookups run in parallel.`,
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := loadRuntimeConfig()
@@ -200,7 +204,7 @@ with what is currently published on the internet.`,
 					records = filtered
 				}
 
-				results := c.VerifyDNSRecords(ctx, domain, records)
+				results := c.VerifyDNSRecords(ctx, domain, records, workers)
 				if jsonOutput {
 					return printer().PrintJSON(results)
 				}
@@ -214,5 +218,6 @@ with what is currently published on the internet.`,
 	}
 
 	cmd.Flags().StringVar(&recordID, "record-id", "", "Verify a single record by ID")
+	cmd.Flags().IntVar(&workers, "workers", dnsverify.DefaultWorkers, "Number of parallel DNS lookups")
 	return cmd
 }
