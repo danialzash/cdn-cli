@@ -23,7 +23,12 @@ func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "verge",
 		Short: "VergeCloud CDN CLI",
-		Long:  "Manage VergeCloud CDN resources from the terminal.",
+		Long: `verge is a command-line interface for the VergeCloud CDN API.
+
+Manage domains, DNS records, firewall rules, WAF packages, and diagnostics
+from your terminal. Run "man verge" for full documentation after installation.
+
+Configuration is stored in ~/.config/vergecloud/config.yaml.`,
 	}
 
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")

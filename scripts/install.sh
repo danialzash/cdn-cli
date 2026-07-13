@@ -7,6 +7,7 @@ set -e
 REPO="danialzash/cdn-cli"
 BINARY="verge"
 INSTALL_DIR="${INSTALL_DIR:-}"
+MAN_DIR="${MAN_DIR:-}"
 
 main() {
   need_cmd uname
@@ -45,6 +46,15 @@ main() {
     mkdir -p "$INSTALL_DIR"
   fi
 
+  if [ -z "$MAN_DIR" ]; then
+    if [ -w "/usr/local/share/man/man1" ]; then
+      MAN_DIR="/usr/local/share/man/man1"
+    else
+      MAN_DIR="${HOME}/.local/share/man/man1"
+    fi
+  fi
+  mkdir -p "$MAN_DIR"
+
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' EXIT
 
@@ -61,18 +71,45 @@ main() {
   tar -xzf "${tmpdir}/${archive}" -C "$tmpdir"
   install -m 0755 "${tmpdir}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 
+  man_count=0
+  for page in "${tmpdir}"/*.1; do
+    if [ -f "$page" ]; then
+      install -m 0644 "$page" "${MAN_DIR}/"
+      man_count=$((man_count + 1))
+    fi
+  done
+
+  if command -v mandb >/dev/null 2>&1; then
+    mandb -q "${MAN_DIR}" 2>/dev/null || true
+  fi
+
   echo ""
   echo "Installed ${BINARY} to ${INSTALL_DIR}/${BINARY}"
+  if [ "$man_count" -gt 0 ]; then
+    echo "Installed ${man_count} man pages to ${MAN_DIR}"
+  fi
   echo ""
   echo "Next steps:"
   echo "  ${BINARY} version"
   echo "  ${BINARY} auth login --api-key <your-api-key>"
+  if [ "$man_count" -gt 0 ]; then
+    echo "  man ${BINARY}"
+  fi
   echo ""
   case ":${PATH}:" in
     *":${INSTALL_DIR}:"*) ;;
     *)
       echo "Add ${INSTALL_DIR} to your PATH, for example:"
       echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+      ;;
+  esac
+  case ":${MANPATH:-}:" in
+    *":${MAN_DIR}:"*) ;;
+    *)
+      if [ "$man_count" -gt 0 ]; then
+        echo "Add ${MAN_DIR} to your MANPATH, for example:"
+        echo "  export MANPATH=\"${MAN_DIR}:\$MANPATH\""
+      fi
       ;;
   esac
 }

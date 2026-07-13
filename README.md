@@ -170,6 +170,39 @@ verge completion fish > ~/.config/fish/completions/verge.fish
 - **Permission denied** writing to `/etc/bash_completion.d/`: use the user-local path above instead of a system path.
 - **Wrong command runs on Tab**: ensure `verge` resolves to the CLI binary (`type verge` should show `/home/you/bin/verge`, not a shell alias).
 
+## Manual pages (`man verge`)
+
+Man pages are auto-generated from the Cobra command tree and included in release archives.
+
+### After install script or release download
+
+The install script copies man pages to `~/.local/share/man/man1` (or `/usr/local/share/man/man1` with permissions). Then:
+
+```bash
+export MANPATH="$HOME/.local/share/man:$MANPATH"   # add to ~/.bashrc or ~/.zshrc
+man verge
+man verge-dns-list
+man verge-auth-login
+```
+
+### From source (developers)
+
+```bash
+make manpages      # generates man/*.1 from commands
+make install-man   # installs to ~/.local/share/man/man1
+export MANPATH="$HOME/.local/share/man:$MANPATH"
+man verge
+```
+
+### System-wide install (Linux)
+
+```bash
+make manpages
+sudo cp man/*.1 /usr/local/share/man/man1/
+sudo mandb
+man verge
+```
+
 ## Quick start
 
 ### 1. Authenticate
@@ -323,6 +356,8 @@ make build            # Build binary to bin/verge
 make test             # Run tests
 make lint             # Run golangci-lint (if installed)
 make generate         # Generate SDK from OpenAPI spec (optional)
+make manpages         # Generate man pages to man/
+make install-man      # Install man pages to ~/.local/share/man/man1
 make release-snapshot # Test GoReleaser build locally (outputs to dist/)
 ```
 

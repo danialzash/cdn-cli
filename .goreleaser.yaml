@@ -6,6 +6,7 @@ before:
   hooks:
     - go mod tidy
     - go test ./...
+    - go run ./cmd/gendocs
 
 builds:
   - id: verge
@@ -41,6 +42,7 @@ archives:
       - README.md
       - LICENSE
       - examples/config.yaml
+      - man/*.1
 
 checksum:
   name_template: checksums.txt
