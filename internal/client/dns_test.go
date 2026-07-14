@@ -35,3 +35,15 @@ func TestBuildDNSValue(t *testing.T) {
 		t.Fatalf("unexpected payload: %s", string(raw))
 	}
 }
+
+func TestExtractPlainDNSValue(t *testing.T) {
+	got := extractPlainDNSValue("a", []byte(`[{"ip":"198.51.100.42"}]`))
+	if got != "198.51.100.42" {
+		t.Fatalf("extractPlainDNSValue() = %q", got)
+	}
+
+	got = extractPlainDNSValue("mx", []byte(`{"host":"mail.example.com","priority":10}`))
+	if got != "mail.example.com" {
+		t.Fatalf("extractPlainDNSValue(mx) = %q", got)
+	}
+}

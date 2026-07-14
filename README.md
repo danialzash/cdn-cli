@@ -299,6 +299,22 @@ verge dns add example.com --type a --name www --value 198.51.100.42 --ttl 300
 verge dns add example.com --type cname --name blog --value target.example.com
 verge dns add example.com --type txt --name _dmarc --value "v=DMARC1; p=none"
 verge dns add example.com --type mx --name @ --value mail.example.com --priority 10
+verge dns add example.com --type a --name www --value 198.51.100.42 --cloud
+```
+
+Update a record (only pass flags you want to change):
+
+```bash
+verge dns update example.com <record-id> --value 198.51.100.50
+verge dns update example.com <record-id> --ttl 600
+verge dns update example.com <record-id> --cloud
+```
+
+Delete a record:
+
+```bash
+verge dns delete example.com <record-id>
+verge dns delete example.com <record-id> --force
 ```
 
 Verify records against live DNS (like `dig`):
@@ -364,6 +380,8 @@ verge firewall list <domain-id>
 verge dns list <domain>
 verge dns get <domain> <record-id>
 verge dns add <domain> --type <type> --name <name> --value <value>
+verge dns update <domain> <record-id> [--value <value>] [--ttl <seconds>] [--cloud]
+verge dns delete <domain> <record-id> [--force]
 verge dns verify <domain> [--record-id <id>] [--workers 10]
 
 verge troubleshoot smartcheck <domain-id>

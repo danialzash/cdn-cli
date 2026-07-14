@@ -33,6 +33,15 @@ type CreateDNSRecordInput struct {
 	Priority int
 }
 
+type UpdateDNSRecordInput struct {
+	Name     *string
+	Type     *string
+	Value    *string
+	TTL      *int
+	Cloud    *bool
+	Priority *int
+}
+
 type DNSVerifyResult struct {
 	RecordID string
 	Name     string
@@ -96,6 +105,143 @@ func (c *Client) CreateDNSRecord(ctx context.Context, domain string, input Creat
 
 	mapped := mapDNSRecord(*record)
 	return &mapped, nil
+}
+
+func (c *Client) UpdateDNSRecord(ctx context.Context, domain, id string, input UpdateDNSRecordInput) (*DNSRecord, error) {
+	existing, err := c.sdk.GetDNSRecord(ctx, domain, id)
+	if err != nil {
+		return nil, err
+	}
+
+	name := existing.Name
+	recordType := existing.Type
+	ttl := existing.TTL
+	cloud := existing.Cloud
+	value := existing.Value
+
+	if input.Name != nil {
+		name = strings.TrimSpace(*input.Name)
+	}
+	if input.Type != nil {
+		recordType = strings.ToLower(strings.TrimSpace(*input.Type))
+	}
+	if input.TTL != nil {
+		ttl = *input.TTL
+	}
+	if input.Cloud != nil {
+		cloud = *input.Cloud
+	}
+
+	rebuildValue := input.Value != nil || input.Type != nil || input.Priority != nil
+	if rebuildValue {
+		plainValue := ""
+		if input.Value != nil {
+			plainValue = strings.TrimSpace(*input.Value)
+		} else {
+			plainValue = extractPlainDNSValue(recordType, existing.Value)
+		}
+
+		priority := extractDNSPriority(recordType, existing.Value)
+		if input.Priority != nil {
+			priority = *input.Priority
+		}
+
+		built, err := buildDNSValue(CreateDNSRecordInput{
+			Name:     name,
+			Type:     recordType,
+			Value:    plainValue,
+			TTL:      ttl,
+			Cloud:    cloud,
+			Priority: priority,
+		})
+		if err != nil {
+			return nil, err
+		}
+		value = built
+	}
+
+	if strings.TrimSpace(name) == "" {
+		return nil, fmt.Errorf("record name cannot be empty")
+	}
+	if strings.TrimSpace(recordType) == "" {
+		return nil, fmt.Errorf("record type cannot be empty")
+	}
+
+	req := sdk.CreateDnsRecordRequest{
+		Name:  name,
+		Type:  recordType,
+		TTL:   ttl,
+		Cloud: cloud,
+		Value: value,
+	}
+
+	record, err := c.sdk.UpdateDNSRecord(ctx, domain, id, req)
+	if err != nil {
+		return nil, err
+	}
+
+	mapped := mapDNSRecord(*record)
+	return &mapped, nil
+}
+
+func (c *Client) DeleteDNSRecord(ctx context.Context, domain, id string) error {
+	return c.sdk.DeleteDNSRecord(ctx, domain, id)
+}
+
+func extractPlainDNSValue(recordType string, raw json.RawMessage) string {
+	recordType = strings.ToLower(recordType)
+	switch recordType {
+	case "a", "aaaa":
+		var values []struct {
+			IP string `json:"ip"`
+		}
+		if err := json.Unmarshal(raw, &values); err == nil && len(values) > 0 {
+			return values[0].IP
+		}
+	case "cname", "aname", "ns", "ptr":
+		var value struct {
+			Host     string `json:"host"`
+			Location string `json:"location"`
+			Domain   string `json:"domain"`
+		}
+		if err := json.Unmarshal(raw, &value); err == nil {
+			if value.Host != "" {
+				return value.Host
+			}
+			if value.Location != "" {
+				return value.Location
+			}
+			return value.Domain
+		}
+	case "txt", "spf", "dkim":
+		var value struct {
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal(raw, &value); err == nil {
+			return value.Text
+		}
+	case "mx":
+		var value struct {
+			Host string `json:"host"`
+		}
+		if err := json.Unmarshal(raw, &value); err == nil {
+			return value.Host
+		}
+	}
+	return ""
+}
+
+func extractDNSPriority(recordType string, raw json.RawMessage) int {
+	if strings.ToLower(recordType) != "mx" {
+		return 0
+	}
+	var value struct {
+		Priority int `json:"priority"`
+	}
+	if err := json.Unmarshal(raw, &value); err == nil {
+		return value.Priority
+	}
+	return 0
 }
 
 func (c *Client) VerifyDNSRecords(ctx context.Context, domain string, records []DNSRecord, workers int) []DNSVerifyResult {

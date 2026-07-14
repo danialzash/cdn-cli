@@ -1,6 +1,7 @@
 package output
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -501,6 +502,27 @@ func (p *Printer) PrintMessage(msg string) {
 		return
 	}
 	fmt.Fprintln(p.Out, msg)
+}
+
+func (p *Printer) Confirm(prompt string) (bool, error) {
+	if p.JSON {
+		return false, fmt.Errorf("confirmation required; re-run with --force")
+	}
+
+	in := os.Stdin
+	if p.Out != os.Stdout && p.Out != os.Stderr {
+		in = os.Stdin
+	}
+
+	fmt.Fprintf(p.Out, "%s [y/N] ", prompt)
+	reader := bufio.NewReader(in)
+	answer, err := reader.ReadString('\n')
+	if err != nil {
+		return false, err
+	}
+
+	answer = strings.ToLower(strings.TrimSpace(answer))
+	return answer == "y" || answer == "yes", nil
 }
 
 func (p *Printer) newTable(headers []string) *tablewriter.Table {

@@ -21,6 +21,8 @@ func newDNSCmd() *cobra.Command {
 		newDNSGetCmd(),
 		newDNSAddCmd(),
 		newDNSVerifyCmd(),
+		newDNSUpdateCmd(),
+		newDNSDeleteCmd(),
 	)
 	return cmd
 }
@@ -220,4 +222,155 @@ with what is currently published on the internet. Lookups run in parallel.`,
 	cmd.Flags().StringVar(&recordID, "record-id", "", "Verify a single record by ID")
 	cmd.Flags().IntVar(&workers, "workers", dnsverify.DefaultWorkers, "Number of parallel DNS lookups")
 	return cmd
+}
+
+func newDNSUpdateCmd() *cobra.Command {
+	var (
+		recordType string
+		name       string
+		value      string
+		ttl        int
+		cloud      bool
+		priority   int
+	)
+
+	cmd := &cobra.Command{
+		Use:   "update <domain> <record-id>",
+		Short: "Update a DNS record",
+		Long: `Update an existing DNS record.
+
+Examples:
+  verge dns update example.com abc123 --value 198.51.100.50
+  verge dns update example.com abc123 --ttl 600
+  verge dns update example.com abc123 --cloud
+  verge dns update example.com abc123 --type cname --value origin.example.com`,
+		Args: cobra.ExactArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			if !dnsUpdateFlagsChanged(cmd) {
+				exitOnError(fmt.Errorf("at least one of --type, --name, --value, --ttl, --cloud, or --priority is required"))
+			}
+
+			cfg, err := loadRuntimeConfig()
+			exitOnError(err)
+
+			c, err := newAPIClient(cfg)
+			exitOnError(err)
+
+			domain := args[0]
+			recordID := args[1]
+			input := buildDNSUpdateInput(cmd, recordType, name, value, ttl, cloud, priority)
+
+			withContext(func(ctx context.Context) error {
+				record, err := c.UpdateDNSRecord(ctx, domain, recordID, input)
+				if err != nil {
+					return fmt.Errorf("update DNS record %q: %w", recordID, err)
+				}
+
+				if jsonOutput {
+					return printer().PrintJSON(record)
+				}
+
+				printer().PrintMessage("DNS record updated successfully.")
+				return printer().PrintDNSRecord(record)
+			})
+		},
+	}
+
+	cmd.Flags().StringVar(&recordType, "type", "", "Record type")
+	cmd.Flags().StringVar(&name, "name", "", "Record name")
+	cmd.Flags().StringVar(&value, "value", "", "Record value")
+	cmd.Flags().IntVar(&ttl, "ttl", 0, "TTL in seconds")
+	cmd.Flags().BoolVar(&cloud, "cloud", false, "Enable CDN proxy (cloud)")
+	cmd.Flags().IntVar(&priority, "priority", 0, "MX priority")
+
+	return cmd
+}
+
+func newDNSDeleteCmd() *cobra.Command {
+	var force bool
+
+	cmd := &cobra.Command{
+		Use:   "delete <domain> <record-id>",
+		Aliases: []string{"rm"},
+		Short: "Delete a DNS record",
+		Args:  cobra.ExactArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg, err := loadRuntimeConfig()
+			exitOnError(err)
+
+			c, err := newAPIClient(cfg)
+			exitOnError(err)
+
+			domain := args[0]
+			recordID := args[1]
+
+			if !force {
+				ok, err := printer().Confirm(
+					fmt.Sprintf("Delete DNS record %q?", recordID),
+				)
+				exitOnError(err)
+
+				if !ok {
+					printer().PrintMessage("Aborted.")
+					return
+				}
+			}
+
+			withContext(func(ctx context.Context) error {
+				if err := c.DeleteDNSRecord(ctx, domain, recordID); err != nil {
+					return fmt.Errorf("delete DNS record %q: %w", recordID, err)
+				}
+
+				if jsonOutput {
+					return printer().PrintJSON(map[string]any{
+						"deleted": true,
+						"id":      recordID,
+					})
+				}
+
+				printer().PrintMessage("DNS record deleted successfully.")
+				return nil
+			})
+		},
+	}
+
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Delete without confirmation")
+
+	return cmd
+}
+
+func dnsUpdateFlagsChanged(cmd *cobra.Command) bool {
+	flags := []string{"type", "name", "value", "ttl", "cloud", "priority"}
+	for _, flag := range flags {
+		if cmd.Flags().Changed(flag) {
+			return true
+		}
+	}
+	return false
+}
+
+func buildDNSUpdateInput(cmd *cobra.Command, recordType, name, value string, ttl int, cloud bool, priority int) client.UpdateDNSRecordInput {
+	input := client.UpdateDNSRecordInput{}
+
+	if cmd.Flags().Changed("type") {
+		t := strings.ToLower(recordType)
+		input.Type = &t
+	}
+	if cmd.Flags().Changed("name") {
+		input.Name = &name
+	}
+	if cmd.Flags().Changed("value") {
+		input.Value = &value
+	}
+	if cmd.Flags().Changed("ttl") {
+		input.TTL = &ttl
+	}
+	if cmd.Flags().Changed("cloud") {
+		input.Cloud = &cloud
+	}
+	if cmd.Flags().Changed("priority") {
+		input.Priority = &priority
+	}
+
+	return input
 }
