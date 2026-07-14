@@ -2,7 +2,7 @@
 
 A minimal, production-quality command-line interface for the [VergeCloud CDN API](https://api.vergecloud.dev/cdn/api-docs).
 
-This is **v0.1.0** — a small, extensible foundation focused on read-only operations and authentication. It is designed to grow with additional resources (DNS, SSL, cache, analytics, WAF rule management) without restructuring.
+This is **v0.2.0** — a small, extensible foundation focused on read-only operations and authentication. It is designed to grow with additional resources (DNS, SSL, cache, analytics, WAF rule management) without restructuring.
 
 ## Features
 
@@ -103,8 +103,8 @@ Ensure `~/bin` is on your `PATH` (for example, `export PATH="$HOME/bin:$PATH"` i
 1. Commit your changes and push to `main`.
 2. Tag a version:
    ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
+   git tag v0.2.0
+   git push origin v0.2.0
    ```
 3. GitHub Actions runs GoReleaser and publishes binaries to [GitHub Releases](https://github.com/danialzash/cdn-cli/releases).
 
