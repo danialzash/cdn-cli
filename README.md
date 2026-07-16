@@ -275,6 +275,7 @@ verge waf packages --domain example.com
 
 ```bash
 verge firewall list example.com
+verge firewall get example.com <rule-id>
 verge firewall add example.com --name "Block country" --filter 'ip.geoip.country in {"IR"}' --action deny
 verge firewall update example.com <rule-id> --name "Block country" --filter 'ip.geoip.country in {"IR"}' --action deny
 verge firewall update example.com <rule-id> --enabled=false
@@ -392,6 +393,7 @@ verge domains inspect <domain>
 verge waf packages [--domain <domain>]
 
 verge firewall list <domain>
+verge firewall get <domain> <rule-id>
 verge firewall add <domain> --name <name> --filter <expr> --action <action> [--priority <n>] [--enabled] [--note <text>]
 verge firewall update <domain> <rule-id> [--name <name>] [--filter <expr>] [--action <action>] [--priority <n>] [--enabled] [--note <text>]
 verge firewall delete <domain> <rule-id> [--force]

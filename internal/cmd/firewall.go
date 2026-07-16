@@ -16,6 +16,7 @@ func newFirewallCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newFirewallListCmd(),
+		newFirewallGetCmd(),
 		newFirewallAddCmd(),
 		newFirewallUpdateCmd(),
 		newFirewallDeleteCmd(),
@@ -50,6 +51,35 @@ func newFirewallListCmd() *cobra.Command {
 					return nil
 				}
 				return printer().PrintFirewallRules(rules)
+			})
+		},
+	}
+}
+
+func newFirewallGetCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "get <domain> <rule-id>",
+		Short: "Get firewall rule details",
+		Args:  cobra.ExactArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg, err := loadRuntimeConfig()
+			exitOnError(err)
+
+			c, err := newAPIClient(cfg)
+			exitOnError(err)
+
+			domain := args[0]
+			ruleID := args[1]
+
+			withContext(func(ctx context.Context) error {
+				rule, err := c.GetFirewallRule(ctx, domain, ruleID)
+				if err != nil {
+					return fmt.Errorf("get firewall rule %q: %w", ruleID, err)
+				}
+				if jsonOutput {
+					return printer().PrintJSON(rule)
+				}
+				return printer().PrintFirewallRule(rule)
 			})
 		},
 	}
