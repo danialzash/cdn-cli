@@ -28,6 +28,8 @@ func (c *SecurityCheck) Run(_ context.Context, state *State) []Finding {
 	}
 
 	findings = append(findings, c.sslAPIFinding(state)...)
+	findings = append(findings, securityHTTPSProbeFinding(state)...)
+	findings = append(findings, securityTLSProbeFinding(state)...)
 	findings = append(findings, c.wafFinding(domain, state)...)
 	findings = append(findings, c.firewallFinding(state)...)
 	findings = append(findings, c.hstsFinding(domain, state)...)
@@ -148,6 +150,7 @@ func (c *SecurityCheck) hstsFinding(domain string, state *State) []Finding {
 		Title:    "HSTS",
 		Severity: SeverityMedium,
 	}
+
 	header := ""
 	if state.HTTPSProbe != nil && state.HTTPSProbe.Error == "" {
 		header = state.HTTPSProbe.Headers["strict-transport-security"]
@@ -180,7 +183,7 @@ func (c *SecurityCheck) hstsFinding(domain string, state *State) []Finding {
 		return []Finding{f}
 	}
 
-	if !httpsOK || !tlsOK {
+	if !httpsOK {
 		if header != "" {
 			f.Status = StatusPass
 			f.Summary = "Strict-Transport-Security header was observed on the public HTTPS response."
@@ -191,26 +194,41 @@ func (c *SecurityCheck) hstsFinding(domain string, state *State) []Finding {
 		return []Finding{f}
 	}
 
-	if apiEnabled && header == "" && httpsOK {
+	if !tlsOK {
+		if apiEnabled && header == "" {
+			f.Status = StatusWarn
+			f.Summary = "HSTS is enabled in VergeCloud but HTTPS/TLS is not healthy."
+		} else if header != "" {
+			f.Status = StatusPass
+			f.Summary = "Strict-Transport-Security header was observed on the public HTTPS response."
+		} else {
+			f.Status = StatusSkip
+			f.Summary = "HSTS cannot be meaningfully evaluated because TLS is not healthy."
+		}
+		return []Finding{f}
+	}
+
+	switch {
+	case apiEnabled && header == "":
 		f.Status = StatusWarn
 		f.Summary = "HSTS is enabled in VergeCloud but no Strict-Transport-Security header was observed."
-		return []Finding{f}
-	}
-	if apiEnabled && !tlsOK {
-		f.Status = StatusWarn
-		f.Summary = "HSTS is enabled in VergeCloud but HTTPS/TLS is not healthy."
-		return []Finding{f}
-	}
-	if !apiEnabled && tlsOK {
+	case apiEnabled && header != "":
+		f.Status = StatusPass
+		f.Summary = "HSTS configuration appears consistent."
+	case !apiEnabled && header != "":
+		f.Status = StatusPass
+		f.Summary = "Strict-Transport-Security header is present even though VergeCloud HSTS is disabled."
+		f.Details = "HSTS may be configured externally or by another layer."
+	case !apiEnabled && header == "":
 		f.Status = StatusWarn
 		f.Summary = "HTTPS works but HSTS is not enabled."
 		f.SuggestedCommands = []string{
 			fmt.Sprintf("verge ssl update %s %s", domain, BoolRemediation("hsts", true)),
 		}
-		return []Finding{f}
+	default:
+		f.Status = StatusPass
+		f.Summary = "HSTS configuration appears consistent."
 	}
-	f.Status = StatusPass
-	f.Summary = "HSTS configuration appears consistent."
 	return []Finding{f}
 }
 

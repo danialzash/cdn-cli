@@ -229,6 +229,7 @@ func TestSmartCheckInspectFailureNoRetry(t *testing.T) {
 	}
 	runner, _ := NewRunner(source)
 	state := &State{
+		InspectRequestedSections: map[string]bool{"smartcheck": true},
 		Inspect: &client.DomainInspect{
 			Errors: []client.InspectError{{Section: "smart_check", Error: "timeout"}},
 		},
@@ -255,7 +256,8 @@ func TestSmartCheckLoadedOnceFromInspect(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := &State{
-		Inspect: &client.DomainInspect{SmartCheck: &client.SmartCheck{ID: "sc1"}},
+		InspectRequestedSections: map[string]bool{"smartcheck": true},
+		Inspect:                  &client.DomainInspect{SmartCheck: &client.SmartCheck{ID: "sc1"}},
 	}
 	runner.prepareSmartCheck(context.Background(), state, "example.com")
 	runner.prepareSmartCheck(context.Background(), state, "example.com")

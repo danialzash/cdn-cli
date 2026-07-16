@@ -97,6 +97,16 @@ func (o Options) Validate() error {
 			return fmt.Errorf("invalid --resolver: %w", err)
 		}
 	}
+	if strings.TrimSpace(o.Origin) != "" {
+		if _, _, _, err := parseOriginHostPort(o.Origin, o.OriginPort); err != nil {
+			return fmt.Errorf("invalid --origin: %w", err)
+		}
+	}
+	if o.OriginPort != 0 {
+		if err := validatePort(o.OriginPort); err != nil {
+			return fmt.Errorf("invalid --origin-port: %w", err)
+		}
+	}
 	if time.Duration(o.Timeout) <= 0 {
 		return fmt.Errorf("--timeout must be positive")
 	}

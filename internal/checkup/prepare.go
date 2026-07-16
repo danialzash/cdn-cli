@@ -119,17 +119,16 @@ func (r *Runner) prepareNSActivation(ctx context.Context, state *State, domain s
 }
 
 func (r *Runner) prepareSmartCheck(ctx context.Context, state *State, domain string) {
-	if state.Inspect != nil {
-		if state.Inspect.SmartCheck != nil {
+	if state.InspectRequestedSections["smartcheck"] {
+		if state.Inspect != nil {
 			state.SmartCheck = state.Inspect.SmartCheck
-			return
-		}
-		if HasInspectSectionError(state.Inspect, "smart_check") {
-			for _, errItem := range InspectSectionErrors(state.Inspect, "smart_check") {
-				state.AddProbeError("smartcheck", errItem.Error)
+			if HasInspectSectionError(state.Inspect, "smart_check") {
+				for _, errItem := range InspectSectionErrors(state.Inspect, "smart_check") {
+					state.AddProbeError("smartcheck", errItem.Error)
+				}
 			}
-			return
 		}
+		return
 	}
 	sc, err := r.source.GetLatestSmartCheck(ctx, domain)
 	if err != nil {
@@ -277,7 +276,9 @@ func (r *Runner) runOriginProbes(ctx context.Context, state *State) {
 	selection := r.selectOrigin(ctx, state, customerDomain, path)
 	state.OriginSelection = selection
 	state.OriginSchemeAttempts = selection.Attempts
-
+	if selection.Scheme == "" || selection.Address == "" {
+		return
+	}
 	scheme := selection.Scheme
 	address := selection.Address
 	tlsSNI := tlsSNIForScheme(scheme, customerDomain)
@@ -285,11 +286,7 @@ func (r *Runner) runOriginProbes(ctx context.Context, state *State) {
 	requestURL := fmt.Sprintf("%s://%s%s", scheme, address, path)
 	state.OriginProbe = mapOriginProbe(ProbeHTTP(ctx, client, requestURL, customerDomain), scheme, address, customerDomain)
 
-	host, _, _ := net.SplitHostPort(address)
-	defaultHost := host
-	if net.ParseIP(host) != nil {
-		defaultHost = address
-	}
+	defaultHost := defaultOriginHostHeader(address)
 	state.OriginHostProbe = mapOriginProbe(ProbeHTTP(ctx, client, requestURL, defaultHost), scheme, address, defaultHost)
 }
 

@@ -3,6 +3,7 @@ package checkup
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -25,18 +26,44 @@ func TestProbeHTTPUnexpectedRedirectHostUsesInitialHost(t *testing.T) {
 
 func TestProbeHTTPRedirectToWWWAccepted(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			http.Redirect(w, r, "https://www.example.com/", http.StatusFound)
-			return
+		switch r.Host {
+		case "example.com":
+			http.Redirect(w, r, "http://www.example.com/final", http.StatusFound)
+		case "www.example.com":
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.Error(w, "unexpected host", http.StatusBadRequest)
 		}
-		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
-	client := NewProbeHTTPClient(5 * time.Second)
+	localAddr := srv.Listener.Addr().String()
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := &net.Dialer{Timeout: 5 * time.Second}
+			return d.DialContext(ctx, network, localAddr)
+		},
+	}
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
+
 	result := ProbeHTTP(context.Background(), client, "http://example.com/", "")
+	if result.Error != "" {
+		t.Fatalf("probe failed: %q", result.Error)
+	}
 	if len(result.RedirectEvidence.UnexpectedHosts) != 0 {
 		t.Fatalf("www redirect should be accepted, got %+v", result.RedirectEvidence.UnexpectedHosts)
+	}
+	if !strings.Contains(result.FinalURL, "www.example.com") {
+		t.Fatalf("final url = %q", result.FinalURL)
 	}
 }
 

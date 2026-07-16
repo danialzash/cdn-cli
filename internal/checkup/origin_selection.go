@@ -29,26 +29,6 @@ func tlsSNIForScheme(scheme, customerDomain string) string {
 	return ""
 }
 
-func parseOriginHostPort(origin string, explicitPort int) (host string, port int, portFromOrigin bool) {
-	host = strings.TrimSpace(origin)
-	port = explicitPort
-	if host == "" {
-		return "", 0, false
-	}
-	if h, p, err := net.SplitHostPort(host); err == nil {
-		host = h
-		if explicitPort == 0 {
-			fmt.Sscanf(p, "%d", &port)
-			portFromOrigin = true
-		}
-	}
-	if explicitPort != 0 {
-		port = explicitPort
-		portFromOrigin = true
-	}
-	return host, port, portFromOrigin
-}
-
 func (r *Runner) selectOrigin(ctx context.Context, state *State, customerDomain, path string) OriginSelection {
 	opts := state.Options
 	scheme := strings.ToLower(strings.TrimSpace(opts.OriginScheme))
@@ -56,15 +36,26 @@ func (r *Runner) selectOrigin(ctx context.Context, state *State, customerDomain,
 		scheme = "auto"
 	}
 
-	host, port, portFromOrigin := parseOriginHostPort(opts.Origin, opts.OriginPort)
+	host, embeddedPort, portProvided, err := parseOriginHostPort(opts.Origin, opts.OriginPort)
+	if err != nil {
+		state.AddProbeError("origin.parse", err.Error())
+		return OriginSelection{}
+	}
+
+	port := embeddedPort
+	if opts.OriginPort != 0 {
+		port = opts.OriginPort
+		portProvided = true
+	}
+
 	timeout := opts.ProbeTimeoutDuration()
 
 	switch scheme {
 	case "http", "https":
-		if !portFromOrigin {
+		if !portProvided {
 			port = originDefaultPort(scheme)
 		}
-		address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
+		address := joinOriginAddress(host, port)
 		return OriginSelection{
 			Scheme:  scheme,
 			Address: address,
@@ -76,7 +67,7 @@ func (r *Runner) selectOrigin(ctx context.Context, state *State, customerDomain,
 			}},
 		}
 	default:
-		if portFromOrigin {
+		if portProvided {
 			httpsAttempt, httpsOK := r.probeOriginScheme(ctx, timeout, "https", host, port, path, customerDomain)
 			if httpsOK {
 				return OriginSelection{Scheme: "https", Address: httpsAttempt.Address, Port: port, Attempts: []OriginSchemeAttempt{httpsAttempt}}
@@ -100,7 +91,7 @@ func (r *Runner) selectOrigin(ctx context.Context, state *State, customerDomain,
 }
 
 func (r *Runner) probeOriginScheme(ctx context.Context, timeout time.Duration, scheme, host string, port int, path, customerDomain string) (OriginSchemeAttempt, bool) {
-	address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
+	address := joinOriginAddress(host, port)
 	client := NewOriginProbeHTTPClient(timeout, address, tlsSNIForScheme(scheme, customerDomain))
 	url := fmt.Sprintf("%s://%s%s", scheme, address, path)
 	probe := ProbeHTTP(ctx, client, url, customerDomain)
@@ -108,4 +99,15 @@ func (r *Runner) probeOriginScheme(ctx context.Context, timeout time.Duration, s
 		return OriginSchemeAttempt{Scheme: scheme, Status: "success", Address: address}, true
 	}
 	return OriginSchemeAttempt{Scheme: scheme, Status: "failed", Error: probe.Error, Address: address}, false
+}
+
+func defaultOriginHostHeader(address string) string {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return address
+	}
+	if net.ParseIP(host) != nil {
+		return address
+	}
+	return host
 }

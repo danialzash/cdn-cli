@@ -34,10 +34,11 @@ type State struct {
 	VisibleCategories map[Category]bool
 	Requirements      Requirements
 
-	Inspect    *client.DomainInspect
-	NSCheck    *client.NSCheckResult
-	CnameCheck *CnameCheckResult
-	SmartCheck *client.SmartCheck
+	Inspect                  *client.DomainInspect
+	InspectRequestedSections map[string]bool
+	NSCheck                  *client.NSCheckResult
+	CnameCheck               *CnameCheckResult
+	SmartCheck               *client.SmartCheck
 
 	DNSResults []dnsverify.Result
 

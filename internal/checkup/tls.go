@@ -44,6 +44,12 @@ func (c *TLSCheck) certificatePresent(state *State) []Finding {
 		}
 		return []Finding{f}
 	}
+	if state.TLSProbe.ProbeExecError {
+		f.Status = StatusError
+		f.Summary = "TLS probe could not be executed."
+		f.Details = state.TLSProbe.Error
+		return []Finding{f}
+	}
 	f.Status = StatusFail
 	f.Summary = "TLS handshake failed."
 	f.Details = state.TLSProbe.Error

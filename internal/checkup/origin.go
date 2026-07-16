@@ -96,27 +96,32 @@ func (c *OriginCheck) hostHeaderFinding(state *State) []Finding {
 	customerStatus, customerSeverity, _ := ClassifyHTTPStatus(state.OriginProbe.StatusCode, state.Options.Path, healthPath)
 	defaultStatus, _, _ := ClassifyHTTPStatus(state.OriginHostProbe.StatusCode, state.Options.Path, healthPath)
 
-	// Compare Host header routing using HTTP status classification, same TLS SNI on both probes.
+	// Compare Host header routing using HTTP status classification.
 	if customerStatus != defaultStatus {
+		scheme := originScheme(state)
+		summary := fmt.Sprintf(
+			"Origin responds differently with customer Host %q (HTTP %d, %s) vs default Host %q (HTTP %d, %s).",
+			state.OriginProbe.HostHeader, state.OriginProbe.StatusCode, customerStatus,
+			state.OriginHostProbe.HostHeader, state.OriginHostProbe.StatusCode, defaultStatus,
+		)
+		evidence := map[string]any{
+			"customer_host": state.OriginProbe.HostHeader,
+			"default_host":  state.OriginHostProbe.HostHeader,
+			"customer_code": state.OriginProbe.StatusCode,
+			"default_code":  state.OriginHostProbe.StatusCode,
+		}
+		if scheme == "https" {
+			summary += fmt.Sprintf(" TLS SNI remained %q on both probes.", state.Domain.Name)
+			evidence["tls_sni"] = state.Domain.Name
+		}
 		return []Finding{{
 			ID:       "origin.host-header",
 			Category: string(CategoryOrigin),
 			Status:   StatusWarn,
 			Severity: SeverityMedium,
 			Title:    "Origin Host header routing",
-			Summary: fmt.Sprintf(
-				"Origin responds differently with customer Host %q (HTTP %d, %s) vs default Host %q (HTTP %d, %s); TLS SNI remains %q on both probes.",
-				state.OriginProbe.HostHeader, state.OriginProbe.StatusCode, customerStatus,
-				state.OriginHostProbe.HostHeader, state.OriginHostProbe.StatusCode, defaultStatus,
-				state.Domain.Name,
-			),
-			Evidence: map[string]any{
-				"customer_host": state.OriginProbe.HostHeader,
-				"default_host":  state.OriginHostProbe.HostHeader,
-				"customer_code": state.OriginProbe.StatusCode,
-				"default_code":  state.OriginHostProbe.StatusCode,
-				"tls_sni":       state.Domain.Name,
-			},
+			Summary:  summary,
+			Evidence: evidence,
 		}}
 	}
 	if customerStatus == StatusFail {
@@ -126,13 +131,18 @@ func (c *OriginCheck) hostHeaderFinding(state *State) []Finding {
 			Summary: fmt.Sprintf("Origin returns HTTP %d with customer Host header.", state.OriginProbe.StatusCode),
 		}}
 	}
+	scheme := originScheme(state)
+	passSummary := "Origin responds consistently with the customer Host header."
+	if scheme == "https" {
+		passSummary = "Origin responds consistently with the customer Host header; TLS SNI was unchanged."
+	}
 	return []Finding{{
 		ID:       "origin.host-header",
 		Category: string(CategoryOrigin),
 		Status:   StatusPass,
 		Severity: SeverityInfo,
 		Title:    "Origin Host header routing",
-		Summary:  "Origin responds consistently with the customer Host header (TLS SNI unchanged).",
+		Summary:  passSummary,
 	}}
 }
 

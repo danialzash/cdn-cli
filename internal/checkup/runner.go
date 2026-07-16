@@ -105,6 +105,7 @@ func (r *Runner) runDomainResolve(ctx context.Context, domainArg string, state *
 	}
 	state.Domain = mapDomainSummary(*detail)
 	sections := inspectSectionsFromRequirements(req)
+	state.InspectRequestedSections = sections
 	state.Inspect, err = r.source.LoadInspect(ctx, detail.Name, sections)
 	if err != nil {
 		return fmt.Errorf("load inspect data: %w", err)

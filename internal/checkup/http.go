@@ -74,18 +74,66 @@ func (c *HTTPCheck) probeFinding(id, title string, probe *HTTPProbeResult, url s
 }
 
 func (c *HTTPCheck) redirectToHTTPSFinding(state *State) []Finding {
-	if state.HTTPProbe == nil || state.HTTPSProbe == nil {
+	if state.HTTPProbe == nil {
 		return []Finding{{
-			ID: "http.redirect-to-https", Category: string(CategoryHTTP),
-			Status: StatusSkip, Severity: SeverityInfo, Title: "HTTP to HTTPS redirect",
-			Summary: "Redirect check skipped because HTTP or HTTPS probe did not run.",
+			ID:       "http.redirect-to-https",
+			Category: string(CategoryHTTP),
+			Status:   StatusError,
+			Severity: SeverityMedium,
+			Title:    "HTTP to HTTPS redirect",
+			Summary:  "Redirect behavior could not be evaluated because the HTTP probe did not run.",
 		}}
 	}
-	if state.HTTPProbe.ProbeExecError || state.HTTPSProbe.ProbeExecError {
+	if state.HTTPProbe.Error != "" {
+		status := StatusSkip
+		severity := SeverityInfo
+		if state.HTTPProbe.ProbeExecError {
+			status = StatusError
+			severity = SeverityMedium
+		}
 		return []Finding{{
-			ID: "http.redirect-to-https", Category: string(CategoryHTTP),
-			Status: StatusSkip, Severity: SeverityInfo, Title: "HTTP to HTTPS redirect",
-			Summary: "Redirect check skipped because HTTP or HTTPS probe could not be executed.",
+			ID:       "http.redirect-to-https",
+			Category: string(CategoryHTTP),
+			Status:   status,
+			Severity: severity,
+			Title:    "HTTP to HTTPS redirect",
+			Summary:  "Redirect behavior could not be evaluated because the HTTP request failed.",
+			Evidence: map[string]any{
+				"http_error":      state.HTTPProbe.Error,
+				"timed_out":       state.HTTPProbe.TimedOut,
+				"execution_error": state.HTTPProbe.ProbeExecError,
+			},
+		}}
+	}
+	if state.HTTPSProbe == nil {
+		return []Finding{{
+			ID:       "http.redirect-to-https",
+			Category: string(CategoryHTTP),
+			Status:   StatusError,
+			Severity: SeverityMedium,
+			Title:    "HTTP to HTTPS redirect",
+			Summary:  "Redirect behavior could not be evaluated because the HTTPS probe did not run.",
+		}}
+	}
+	if state.HTTPSProbe.Error != "" {
+		status := StatusSkip
+		severity := SeverityInfo
+		if state.HTTPSProbe.ProbeExecError {
+			status = StatusError
+			severity = SeverityMedium
+		}
+		return []Finding{{
+			ID:       "http.redirect-to-https",
+			Category: string(CategoryHTTP),
+			Status:   status,
+			Severity: severity,
+			Title:    "HTTP to HTTPS redirect",
+			Summary:  "Redirect behavior could not be evaluated because the HTTPS request failed.",
+			Evidence: map[string]any{
+				"https_error":     state.HTTPSProbe.Error,
+				"timed_out":       state.HTTPSProbe.TimedOut,
+				"execution_error": state.HTTPSProbe.ProbeExecError,
+			},
 		}}
 	}
 
@@ -98,7 +146,7 @@ func (c *HTTPCheck) redirectToHTTPSFinding(state *State) []Finding {
 		}}
 	}
 
-	httpsOK := state.HTTPSProbe.Error == "" && state.HTTPSProbe.StatusCode >= 200 && state.HTTPSProbe.StatusCode < 400
+	httpsOK := state.HTTPSProbe.StatusCode >= 200 && state.HTTPSProbe.StatusCode < 400
 	tlsOK := state.TLSProbe != nil && state.TLSProbe.Connected && state.TLSProbe.HostnameMatch && !state.TLSProbe.Expired
 	redirectObserved := httpRedirectsToHTTPS(state.HTTPProbe)
 	sslRedirectEnabled := state.Inspect.SSL.HTTPSRedirect

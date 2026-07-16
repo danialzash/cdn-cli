@@ -21,23 +21,23 @@ func cloudProxyStrongEvidenceForRecord(state *State, result dnsverify.Result, ho
 	if strong, source := hostnameEdgeProbeStrong(state, hostname); strong {
 		return true, source
 	}
-	expected := strings.TrimSuffix(strings.ToLower(state.Domain.CnameTarget), ".")
+
+	expected := normalizeCnameHost(state.Domain.CnameTarget)
+	custom := normalizeCnameHost(state.Domain.CustomCname)
+
 	if expected != "" && cnameTargetMatches(result.Actual, expected) {
 		return true, "cname-target"
 	}
-	if state.Domain.CustomCname != "" {
-		custom := strings.TrimSuffix(strings.ToLower(state.Domain.CustomCname), ".")
-		if custom != "" && cnameTargetMatches(result.Actual, custom) {
-			return true, "custom-cname-target"
-		}
+	if custom != "" && cnameTargetMatches(result.Actual, custom) {
+		return true, "custom-cname-target"
 	}
-	if chain := state.HostCNAMEChains[hostname]; len(chain) > 0 {
-		if expected != "" {
-			for _, hop := range chain {
-				if cnameTargetMatches(hop, expected) {
-					return true, "cname-target"
-				}
-			}
+
+	for _, hop := range state.HostCNAMEChains[hostname] {
+		if expected != "" && cnameTargetMatches(hop, expected) {
+			return true, "cname-target"
+		}
+		if custom != "" && cnameTargetMatches(hop, custom) {
+			return true, "custom-cname-target"
 		}
 	}
 	return false, "none"

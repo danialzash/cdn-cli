@@ -59,7 +59,34 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 		}
 	}
 
-	if state.HTTPSProbe == nil || state.HTTPSProbe.Error != "" || state.HTTPSProbe.ProbeExecError {
+	if state.HTTPSProbe == nil {
+		findings = append(findings, Finding{
+			ID:       "cache.repeated-request",
+			Category: string(CategoryCache),
+			Status:   StatusError,
+			Severity: SeverityMedium,
+			Title:    "Repeated request cache behavior",
+			Summary:  "The initial cache probe did not run.",
+		})
+		return findings
+	}
+	if state.HTTPSProbe.Error != "" {
+		status := StatusFail
+		if state.HTTPSProbe.ProbeExecError {
+			status = StatusError
+		}
+		findings = append(findings, Finding{
+			ID:       "cache.repeated-request",
+			Category: string(CategoryCache),
+			Status:   status,
+			Severity: SeverityMedium,
+			Title:    "Repeated request cache behavior",
+			Summary:  "The initial cache probe could not be completed.",
+			Evidence: map[string]any{
+				"first_probe_error":     state.HTTPSProbe.Error,
+				"first_probe_timed_out": state.HTTPSProbe.TimedOut,
+			},
+		})
 		return findings
 	}
 	if state.SecondHTTPSProbe == nil {

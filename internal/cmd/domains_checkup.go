@@ -37,11 +37,15 @@ problems, suggest concrete solutions, and optionally apply safe fixes.
 Combine VergeCloud configuration with live DNS, HTTP, TLS, cache, CDN, and optional
 origin tests. Read-only by default; pass --fix to review and apply safe fixes.`,
 		Args: cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			onlyCats, err := checkup.ParseCategories(only)
-			exitOnError(err)
+			if err != nil {
+				return err
+			}
 			skipCats, err := checkup.ParseCategories(skip)
-			exitOnError(err)
+			if err != nil {
+				return err
+			}
 
 			opts := checkup.DefaultOptions()
 			opts.Only = onlyCats
@@ -59,22 +63,28 @@ origin tests. Read-only by default; pass --fix to review and apply safe fixes.`,
 			opts.DryRun = dryRun
 
 			if err := opts.Validate(); err != nil {
-				exitOnError(err)
+				return err
 			}
 			if jsonOutput && fix && !yes && !dryRun {
-				exitOnError(fmt.Errorf("--json with --fix requires --yes or --dry-run"))
+				return fmt.Errorf("--json with --fix requires --yes or --dry-run")
 			}
 
 			cfg, err := loadRuntimeConfig()
-			exitOnError(err)
+			if err != nil {
+				return err
+			}
 
 			apiClient, err := newAPIClient(cfg)
-			exitOnError(err)
+			if err != nil {
+				return err
+			}
 
 			domainArg := args[0]
 			source := checkup.NewClientSource(apiClient)
 			runner, err := checkup.NewRunner(source)
-			exitOnError(err)
+			if err != nil {
+				return err
+			}
 
 			exitCode, err := withCheckupContext(opts.TimeoutDuration(), func(ctx context.Context) (int, error) {
 				result := runner.Run(ctx, domainArg, opts)
@@ -118,7 +128,7 @@ origin tests. Read-only by default; pass --fix to review and apply safe fixes.`,
 
 				return result.Report.ExitCode, nil
 			})
-			finishCheckup(exitCode, err)
+			return checkupExitError(exitCode, err)
 		},
 	}
 

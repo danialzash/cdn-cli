@@ -56,9 +56,20 @@ func (c *CDNCheck) edgeFinding(state *State) Finding {
 		Title:    "VergeCloud edge detection",
 		Severity: SeverityMedium,
 	}
-	if state.HTTPSProbe == nil || state.HTTPSProbe.Error != "" {
-		f.Status = StatusSkip
-		f.Summary = "Edge detection skipped because HTTPS probe failed."
+	if state.HTTPSProbe == nil {
+		f.Status = StatusError
+		f.Summary = "The required HTTPS edge probe did not run."
+		return f
+	}
+	if state.HTTPSProbe.Error != "" {
+		if state.HTTPSProbe.ProbeExecError {
+			f.Status = StatusError
+			f.Summary = "The required HTTPS edge probe could not be executed."
+		} else {
+			f.Status = StatusFail
+			f.Summary = "The HTTPS request failed, so VergeCloud edge delivery could not be confirmed."
+		}
+		f.Evidence = map[string]any{"error": state.HTTPSProbe.Error}
 		return f
 	}
 	evidence := DetectEdgeEvidence(state.HTTPSProbe.AnalysisHeaders)
