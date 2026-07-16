@@ -11,8 +11,7 @@ type Requirements struct {
 	DNSWWW          bool
 	DNSRecords      bool
 	SmartCheck      bool
-	ActivationNS    bool
-	ActivationCNAME bool
+	Activation      bool
 	Origin          bool
 }
 
@@ -34,8 +33,7 @@ func (r Requirements) Merge(other Requirements) Requirements {
 	out.DNSWWW = out.DNSWWW || other.DNSWWW
 	out.DNSRecords = out.DNSRecords || other.DNSRecords
 	out.SmartCheck = out.SmartCheck || other.SmartCheck
-	out.ActivationNS = out.ActivationNS || other.ActivationNS
-	out.ActivationCNAME = out.ActivationCNAME || other.ActivationCNAME
+	out.Activation = out.Activation || other.Activation
 	out.Origin = out.Origin || other.Origin
 	return out
 }
@@ -52,8 +50,7 @@ func categoryRequirements(cat Category) Requirements {
 	case CategoryActivation:
 		return Requirements{
 			InspectSections: map[string]bool{"dns": true},
-			ActivationNS:    true,
-			ActivationCNAME: true,
+			Activation:      true,
 		}
 	case CategoryDNS:
 		return Requirements{
@@ -126,7 +123,7 @@ func inspectSectionsFromRequirements(req Requirements) map[string]bool {
 			sections[k] = true
 		}
 	}
-	if req.DNSRecords || req.DNSApex || req.DNSWWW || req.ActivationNS || req.ActivationCNAME {
+	if req.DNSRecords || req.DNSApex || req.DNSWWW || req.Activation {
 		sections["dns"] = true
 	}
 	if req.SmartCheck {

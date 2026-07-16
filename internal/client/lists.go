@@ -83,8 +83,8 @@ func (c *Client) CreateList(ctx context.Context, input CreateListInput) (*List, 
 	}
 
 	req := sdk.CreateListRequest{
-		Name:  input.Name,
-		Type:  strings.ToLower(input.Type),
+		Name:   input.Name,
+		Type:   strings.ToLower(input.Type),
 		Values: values,
 	}
 	if input.Description != "" {

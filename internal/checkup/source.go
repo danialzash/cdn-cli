@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/vergecloud/cdn-cli/internal/client"
 )
@@ -37,11 +38,12 @@ func (s *ClientSource) GetLatestSmartCheck(ctx context.Context, domain string) (
 }
 
 type ClientFixApplier struct {
-	Client *client.Client
+	Client       *client.Client
+	ProbeTimeout time.Duration
 }
 
 func NewClientFixApplier(c *client.Client) *ClientFixApplier {
-	return &ClientFixApplier{Client: c}
+	return &ClientFixApplier{Client: c, ProbeTimeout: DefaultProbeTimeout}
 }
 
 func (a *ClientFixApplier) ApplyFix(ctx context.Context, domain string, plan FixPlan) error {
@@ -58,37 +60,47 @@ func (a *ClientFixApplier) ApplyFix(ctx context.Context, domain string, plan Fix
 	}
 }
 
-func (a *ClientFixApplier) VerifyFix(ctx context.Context, domain string, plan FixPlan) (bool, string, error) {
+func (a *ClientFixApplier) VerifyFix(ctx context.Context, domain string, plan FixPlan) (FixVerification, string, error) {
 	switch {
 	case plan.ID == "cache.developer-mode":
 		settings, err := a.Client.GetCacheSettings(ctx, domain)
 		if err != nil {
-			return false, "", err
+			return FixVerification{}, "", err
 		}
 		if settings.DeveloperMode {
-			return false, "cache developer mode is still enabled", nil
+			return FixVerification{ConfigurationVerified: false}, "cache developer mode is still enabled", nil
 		}
-		return true, "", nil
+		return FixVerification{ConfigurationVerified: true, BehaviorVerified: true}, "", nil
 	case strings.HasPrefix(plan.ID, "dns.mail-cloud-proxy."):
 		recordID := strings.TrimPrefix(plan.ID, "dns.mail-cloud-proxy.")
 		record, err := a.Client.GetDNSRecord(ctx, domain, recordID)
 		if err != nil {
-			return false, "", err
+			return FixVerification{}, "", err
 		}
 		if record.Cloud {
-			return false, "DNS record cloud proxy is still enabled", nil
+			return FixVerification{ConfigurationVerified: false}, "DNS record cloud proxy is still enabled", nil
 		}
-		return true, "", nil
+		return FixVerification{ConfigurationVerified: true, BehaviorVerified: true}, "", nil
 	case plan.ID == "ssl.https-redirect":
 		settings, err := a.Client.GetSslSettings(ctx, domain)
 		if err != nil {
-			return false, "", err
+			return FixVerification{}, "", err
 		}
+		verification := FixVerification{ConfigurationVerified: settings.HTTPSRedirect}
 		if !settings.HTTPSRedirect {
-			return false, "HTTPS redirect is still disabled", nil
+			return verification, "HTTPS redirect is still disabled", nil
 		}
-		return true, "", nil
+		timeout := a.ProbeTimeout
+		if timeout <= 0 {
+			timeout = DefaultProbeTimeout
+		}
+		probe := ProbeHTTP(ctx, NewProbeHTTPClient(timeout), "http://"+domain+"/", "")
+		verification.BehaviorVerified = httpRedirectsToHTTPS(probe)
+		if !verification.BehaviorVerified {
+			return verification, "HTTPS redirect is enabled in the API but live HTTP did not redirect to HTTPS", nil
+		}
+		return verification, "", nil
 	default:
-		return false, "", fmt.Errorf("unsupported automatic fix %q", plan.ID)
+		return FixVerification{}, "", fmt.Errorf("unsupported automatic fix %q", plan.ID)
 	}
 }

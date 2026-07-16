@@ -61,10 +61,10 @@ func (c *OriginCheck) connectivityFinding(state *State) []Finding {
 		state.Domain.Name,
 	)
 	f.Evidence = map[string]any{
-		"address":      state.OriginProbe.Address,
-		"status_code":  state.OriginProbe.StatusCode,
-		"host_header":  state.OriginProbe.HostHeader,
-		"tls_sni":      state.Domain.Name,
+		"address":     state.OriginProbe.Address,
+		"status_code": state.OriginProbe.StatusCode,
+		"host_header": state.OriginProbe.HostHeader,
+		"tls_sni":     state.Domain.Name,
 	}
 	return []Finding{f}
 }
@@ -95,11 +95,11 @@ func (c *OriginCheck) hostHeaderFinding(state *State) []Finding {
 				state.Domain.Name,
 			),
 			Evidence: map[string]any{
-				"customer_host":  state.OriginProbe.HostHeader,
-				"default_host":   state.OriginHostProbe.HostHeader,
-				"customer_code":  state.OriginProbe.StatusCode,
-				"default_code":   state.OriginHostProbe.StatusCode,
-				"tls_sni":        state.Domain.Name,
+				"customer_host": state.OriginProbe.HostHeader,
+				"default_host":  state.OriginHostProbe.HostHeader,
+				"customer_code": state.OriginProbe.StatusCode,
+				"default_code":  state.OriginHostProbe.StatusCode,
+				"tls_sni":       state.Domain.Name,
 			},
 		}}
 	}

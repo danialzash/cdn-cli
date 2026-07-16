@@ -122,28 +122,63 @@ func (r *Runner) ApplyFixes(ctx context.Context, domainArg string, report *Repor
 		return
 	}
 	fixRunner := NewFixRunner(applier, verifier)
-	report.Fixes = fixRunner.Apply(ctx, report.Domain.Name, plans, opts.DryRun)
-	fixFailed := FixFailed(report.Fixes) || fixVerificationFailed(report.Fixes)
+	fixResults := fixRunner.Apply(ctx, report.Domain.Name, plans, opts.DryRun)
+	report.Fixes = fixResults
+	fixFailed := FixFailed(fixResults) || fixVerificationFailed(fixResults)
 
-	if opts.DryRun || !anyFixApplied(report.Fixes) {
+	if opts.DryRun || !anyFixApplied(fixResults) {
 		if fixFailed {
 			report.ExitCode = ExitFixFailed
 		}
 		return
 	}
 
-	rerun := r.Run(ctx, domainArg, opts)
+	rerunOpts := opts
+	rerunOpts.Fix = false
+	rerunOpts.Yes = false
+	rerunOpts.DryRun = false
+
+	rerun := r.Run(ctx, domainArg, rerunOpts)
 	if rerun.Err != nil {
 		report.ExitCode = ExitError
 		return
 	}
-	rerun.Report.Fixes = report.Fixes
+
+	for i, result := range fixResults {
+		if !result.Applied || result.DryRun {
+			continue
+		}
+		plan := findPlan(plans, result.FixID)
+		if plan == nil {
+			continue
+		}
+		if FindingStillUnhealthy(rerun.Report, *plan) {
+			fixResults[i].Verified = false
+			fixResults[i].Verification.BehaviorVerified = false
+			if fixResults[i].Error == "" {
+				fixResults[i].Error = "expected finding still reports an issue after fix"
+			}
+			fixFailed = true
+		}
+	}
+
+	rerun.Report.Fixes = fixResults
+	rerun.Report.Options = opts
 	*report = rerun.Report
 	if fixFailed {
 		report.ExitCode = ExitFixFailed
 	} else {
 		report.ExitCode = ComputeExitCode(report.Summary, opts.Strict, report.ProbeErrors, false)
 	}
+}
+
+func findPlan(plans []FixPlan, id string) *FixPlan {
+	for i := range plans {
+		if plans[i].ID == id {
+			return &plans[i]
+		}
+	}
+	return nil
 }
 
 func anyFixApplied(results []FixResult) bool {
@@ -157,7 +192,7 @@ func anyFixApplied(results []FixResult) bool {
 
 func fixVerificationFailed(results []FixResult) bool {
 	for _, r := range results {
-		if r.Applied && !r.Verified {
+		if r.Applied && (!r.Verified || r.Error != "") {
 			return true
 		}
 	}

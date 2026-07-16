@@ -17,11 +17,18 @@ func (c *ActivationCheck) Run(_ context.Context, state *State) []Finding {
 
 	findings = append(findings, c.checkDomainStatus(state)...)
 
-	domainType := strings.ToLower(state.Domain.Type)
-	if domainType == "partial" || domainType == "cname" {
+	domainType := strings.ToLower(strings.TrimSpace(state.Domain.Type))
+	switch domainType {
+	case "partial":
 		findings = append(findings, c.checkCNAME(state)...)
-	} else {
+	case "full":
 		findings = append(findings, c.checkNameservers(state)...)
+	default:
+		findings = append(findings, Finding{
+			ID: "activation.domain-type", Category: string(CategoryActivation),
+			Status: StatusError, Severity: SeverityMedium, Title: "Domain type",
+			Summary: fmt.Sprintf("Unsupported domain type %q for activation checks.", state.Domain.Type),
+		})
 	}
 
 	return findings

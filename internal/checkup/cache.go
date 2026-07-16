@@ -17,15 +17,21 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 	domain := state.Domain.Name
 
 	if state.Inspect != nil {
-		if state.Inspect.Cache.DeveloperMode {
+		if HasInspectSectionError(state.Inspect, "cache") {
+			for _, errItem := range InspectSectionErrors(state.Inspect, "cache") {
+				f := inspectSectionErrorFinding("cache.api", string(CategoryCache), errItem.Section, "Cache configuration")
+				f.Evidence["error"] = errItem.Error
+				findings = append(findings, f)
+			}
+		} else if state.Inspect.Cache.DeveloperMode {
 			cmd := fmt.Sprintf("verge cache update %s %s", domain, BoolRemediation("developer-mode", false))
 			findings = append(findings, Finding{
-				ID:       "cache.developer-mode",
-				Category: string(CategoryCache),
-				Status:   StatusWarn,
-				Severity: SeverityMedium,
-				Title:    "Cache developer mode",
-				Summary:  "Developer mode is enabled, so normal edge caching may be bypassed.",
+				ID:                "cache.developer-mode",
+				Category:          string(CategoryCache),
+				Status:            StatusWarn,
+				Severity:          SeverityMedium,
+				Title:             "Cache developer mode",
+				Summary:           "Developer mode is enabled, so normal edge caching may be bypassed.",
 				SuggestedCommands: []string{cmd},
 				Fix: &FixPlan{
 					ID:          "cache.developer-mode",
@@ -37,7 +43,7 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 					After:       map[string]any{"developer_mode": false},
 				},
 			})
-		} else if cacheConfigAvailable(state) {
+		} else {
 			findings = append(findings, Finding{
 				ID:       "cache.developer-mode",
 				Category: string(CategoryCache),
@@ -48,82 +54,73 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 			})
 		}
 
-		findings = append(findings, c.cacheConfigFinding(state)...)
+		if !HasInspectSectionError(state.Inspect, "cache") {
+			findings = append(findings, c.cacheConfigFinding(state)...)
+		}
 	}
 
-	if state.HTTPSProbe != nil && state.SecondHTTPSProbe != nil {
-		first := CacheStatusFromHeaders(state.HTTPSProbe.Headers)
-		second := CacheStatusFromHeaders(state.SecondHTTPSProbe.Headers)
-		f := Finding{
-			ID:       "cache.repeated-request",
-			Category: string(CategoryCache),
-			Title:    "Repeated request cache behavior",
-			Severity: SeverityInfo,
-			Evidence: map[string]any{
-				"first_status":    first,
-				"second_status":   second,
-				"cache_control":   state.HTTPSProbe.Headers["cache-control"],
-				"age":             state.HTTPSProbe.Headers["age"],
-				"vary":            state.HTTPSProbe.Headers["vary"],
-				"first_headers":   state.HTTPSProbe.Headers,
-				"second_headers":  state.SecondHTTPSProbe.Headers,
-			},
-		}
-		switch {
-		case strings.Contains(second, "hit"):
-			f.Status = StatusPass
-			f.Summary = fmt.Sprintf("First request was %s and the second request was a cache hit.", first)
-		case strings.Contains(first, "bypass"):
-			f.Status = StatusWarn
-			f.Summary = "Repeated requests show cache bypass behavior."
-		case strings.Contains(first, "miss") || strings.Contains(second, "miss"):
-			f.Status = StatusWarn
-			f.Summary = "No cache hit was observed on the repeated request."
-		default:
-			f.Status = StatusWarn
-			f.Summary = "Cache hit/miss behavior could not be determined from response headers."
-		}
-		findings = append(findings, f)
+	if state.HTTPSProbe == nil || state.SecondHTTPSProbe == nil ||
+		state.HTTPSProbe.Error != "" || state.SecondHTTPSProbe.Error != "" ||
+		state.HTTPSProbe.ProbeExecError || state.SecondHTTPSProbe.ProbeExecError {
+		return findings
+	}
 
-		if cc, ok := state.HTTPSProbe.Headers["cache-control"]; ok {
-			lower := strings.ToLower(cc)
-			if strings.Contains(lower, "no-store") || strings.Contains(lower, "private") || strings.Contains(lower, "no-cache") {
-				findings = append(findings, Finding{
-					ID:       "cache.cache-control",
-					Category: string(CategoryCache),
-					Status:   StatusWarn,
-					Severity: SeverityLow,
-					Title:    "Cache-Control headers",
-					Summary:  fmt.Sprintf("Response Cache-Control may prevent caching: %s", cc),
-				})
-			}
+	first := CacheStatusFromHeaders(state.HTTPSProbe.Headers)
+	second := CacheStatusFromHeaders(state.SecondHTTPSProbe.Headers)
+	f := Finding{
+		ID:       "cache.repeated-request",
+		Category: string(CategoryCache),
+		Title:    "Repeated request cache behavior",
+		Severity: SeverityInfo,
+		Evidence: map[string]any{
+			"first_status":   first,
+			"second_status":  second,
+			"cache_control":  state.HTTPSProbe.Headers["cache-control"],
+			"age":            state.HTTPSProbe.Headers["age"],
+			"vary":           state.HTTPSProbe.Headers["vary"],
+			"first_headers":  state.HTTPSProbe.Headers,
+			"second_headers": state.SecondHTTPSProbe.Headers,
+		},
+	}
+	switch {
+	case strings.Contains(second, "hit"):
+		f.Status = StatusPass
+		f.Summary = fmt.Sprintf("First request was %s and the second request was a cache hit.", first)
+	case strings.Contains(first, "bypass"):
+		f.Status = StatusWarn
+		f.Summary = "Repeated requests show cache bypass behavior."
+	case strings.Contains(first, "miss") || strings.Contains(second, "miss"):
+		f.Status = StatusWarn
+		f.Summary = "No cache hit was observed on the repeated request."
+	default:
+		f.Status = StatusWarn
+		f.Summary = "Cache hit/miss behavior could not be determined from response headers."
+	}
+	findings = append(findings, f)
+
+	if cc, ok := state.HTTPSProbe.Headers["cache-control"]; ok {
+		lower := strings.ToLower(cc)
+		if strings.Contains(lower, "no-store") || strings.Contains(lower, "private") || strings.Contains(lower, "no-cache") {
+			findings = append(findings, Finding{
+				ID: "cache.cache-control", Category: string(CategoryCache),
+				Status: StatusWarn, Severity: SeverityLow, Title: "Cache-Control headers",
+				Summary: fmt.Sprintf("Response Cache-Control may prevent caching: %s", cc),
+			})
 		}
+	}
+	if vary, ok := state.HTTPSProbe.Headers["vary"]; ok && strings.TrimSpace(vary) == "*" {
+		findings = append(findings, Finding{
+			ID: "cache.vary-star", Category: string(CategoryCache),
+			Status: StatusWarn, Severity: SeverityLow, Title: "Vary header",
+			Summary: "Vary: * indicates shared caching is unlikely.",
+		})
 	}
 
 	return findings
 }
 
-func cacheConfigAvailable(state *State) bool {
-	if state.Inspect == nil {
-		return false
-	}
-	for _, errItem := range state.Inspect.Errors {
-		if errItem.Section == "cache" {
-			return false
-		}
-	}
-	return true
-}
-
 func (c *CacheCheck) cacheConfigFinding(state *State) []Finding {
 	cache := state.Inspect.Cache
-	if !cacheConfigAvailable(state) {
-		return []Finding{{
-			ID: "cache.edge-status", Category: string(CategoryCache),
-			Status: StatusError, Severity: SeverityMedium, Title: "Cache configuration",
-			Summary: "Cache configuration could not be loaded from the API.",
-		}}
-	}
 	status := strings.TrimSpace(strings.ToLower(cache.Status))
 	f := Finding{
 		ID: "cache.edge-status", Category: string(CategoryCache), Title: "Cache configuration",

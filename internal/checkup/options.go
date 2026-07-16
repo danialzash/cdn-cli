@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/vergecloud/cdn-cli/internal/dnsverify"
 )
 
 const (
@@ -13,19 +15,19 @@ const (
 )
 
 type Options struct {
-	Only          []Category    `json:"only,omitempty"`
-	Skip          []Category    `json:"skip,omitempty"`
-	Path          string        `json:"path"`
-	Origin        string        `json:"origin,omitempty"`
-	OriginPort    int           `json:"origin_port,omitempty"`
-	OriginScheme  string        `json:"origin_scheme"`
-	Timeout       time.Duration `json:"timeout"`
-	ProbeTimeout  time.Duration `json:"probe_timeout"`
-	Resolvers     []string      `json:"resolvers,omitempty"`
-	Strict        bool          `json:"strict"`
-	Fix           bool          `json:"fix"`
-	Yes           bool          `json:"yes"`
-	DryRun        bool          `json:"dry_run"`
+	Only         []Category    `json:"only,omitempty"`
+	Skip         []Category    `json:"skip,omitempty"`
+	Path         string        `json:"path"`
+	Origin       string        `json:"origin,omitempty"`
+	OriginPort   int           `json:"origin_port,omitempty"`
+	OriginScheme string        `json:"origin_scheme"`
+	Timeout      time.Duration `json:"timeout"`
+	ProbeTimeout time.Duration `json:"probe_timeout"`
+	Resolvers    []string      `json:"resolvers,omitempty"`
+	Strict       bool          `json:"strict"`
+	Fix          bool          `json:"fix"`
+	Yes          bool          `json:"yes"`
+	DryRun       bool          `json:"dry_run"`
 }
 
 func ParseCategories(values []string) ([]Category, error) {
@@ -89,6 +91,11 @@ func (o Options) Validate() error {
 	case "", "auto", "http", "https":
 	default:
 		return fmt.Errorf("invalid --origin-scheme %q: use auto, http, or https", o.OriginScheme)
+	}
+	if len(o.Resolvers) > 0 {
+		if _, err := dnsverify.NormalizeResolvers(o.Resolvers); err != nil {
+			return fmt.Errorf("invalid --resolver: %w", err)
+		}
 	}
 	if o.Timeout <= 0 {
 		return fmt.Errorf("--timeout must be positive")

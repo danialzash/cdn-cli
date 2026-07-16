@@ -74,14 +74,3 @@ func (p *Printer) printFinding(f checkup.Finding) {
 	}
 	fmt.Fprintln(p.Out)
 }
-
-func (p *Printer) PrintCheckupFixPlans(plans []checkup.FixPlan) {
-	fmt.Fprintln(p.Out, titleStyle.Render("Proposed fixes"))
-	for _, plan := range plans {
-		fmt.Fprintf(p.Out, "  [%s] %s\n", plan.Safety, plan.Description)
-		if plan.Command != "" {
-			fmt.Fprintf(p.Out, "    Command: %s\n", plan.Command)
-		}
-	}
-	fmt.Fprintln(p.Out)
-}

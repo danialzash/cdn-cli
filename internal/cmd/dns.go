@@ -290,10 +290,10 @@ func newDNSDeleteCmd() *cobra.Command {
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:   "delete <domain> <record-id>",
+		Use:     "delete <domain> <record-id>",
 		Aliases: []string{"rm"},
-		Short: "Delete a DNS record",
-		Args:  cobra.ExactArgs(2),
+		Short:   "Delete a DNS record",
+		Args:    cobra.ExactArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := loadRuntimeConfig()
 			exitOnError(err)

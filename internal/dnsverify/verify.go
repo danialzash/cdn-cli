@@ -87,7 +87,7 @@ func (c *Checker) verifyHost(ctx context.Context, result Result, queryName, reco
 			filtered = append(filtered, parsed.String())
 		}
 	}
-		sort.Strings(filtered)
+	sort.Strings(filtered)
 	result.Actual = strings.Join(filtered, ", ")
 
 	if len(filtered) == 0 {

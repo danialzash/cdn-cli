@@ -3,68 +3,84 @@ package checkup
 import (
 	"context"
 	"net"
-	"strings"
+	"sync/atomic"
 	"time"
+
+	"github.com/vergecloud/cdn-cli/internal/dnsverify"
 )
+
+var publicResolverDialIndex atomic.Uint64
 
 // PublicDNSResolver performs public DNS lookups using configured resolvers.
 type PublicDNSResolver struct {
-	Resolver *net.Resolver
+	servers []string
+	timeout time.Duration
 }
 
-func NewPublicDNSResolver(resolvers []string, timeout time.Duration) *PublicDNSResolver {
-	if len(resolvers) == 0 {
-		return &PublicDNSResolver{Resolver: net.DefaultResolver}
+func NewPublicDNSResolver(resolvers []string, timeout time.Duration) (*PublicDNSResolver, error) {
+	servers, err := dnsverify.NormalizeResolvers(resolvers)
+	if err != nil {
+		return nil, err
 	}
-	dialer := &net.Dialer{Timeout: timeout}
-	return &PublicDNSResolver{
-		Resolver: &net.Resolver{
-			PreferGo: true,
-			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				if len(resolvers) > 0 {
-					address = net.JoinHostPort(resolvers[0], "53")
-				}
-				return dialer.DialContext(ctx, network, address)
-			},
+	return &PublicDNSResolver{servers: servers, timeout: timeout}, nil
+}
+
+func (r *PublicDNSResolver) dial(ctx context.Context, network string) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: r.timeout}
+	if len(r.servers) == 0 {
+		return dialer.DialContext(ctx, network, "")
+	}
+	index := publicResolverDialIndex.Add(1) - 1
+	server := r.servers[index%uint64(len(r.servers))]
+	return dialer.DialContext(ctx, network, server)
+}
+
+func (r *PublicDNSResolver) resolver() *net.Resolver {
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			return r.dial(ctx, network)
 		},
 	}
 }
 
+func (r *PublicDNSResolver) LookupHost(ctx context.Context, name string) ([]string, error) {
+	if r == nil {
+		return nil, net.ErrClosed
+	}
+	return r.resolver().LookupHost(ctx, name)
+}
+
 func (r *PublicDNSResolver) LookupCNAME(ctx context.Context, name string) (string, error) {
-	if r == nil || r.Resolver == nil {
+	if r == nil {
 		return "", net.ErrClosed
 	}
-	cname, err := r.Resolver.LookupCNAME(ctx, name)
+	cname, err := r.resolver().LookupCNAME(ctx, name)
 	if err != nil {
 		return "", err
 	}
 	return normalizeCnameHost(cname), nil
 }
 
-func (r *PublicDNSResolver) HostResolves(ctx context.Context, name string) bool {
-	if r == nil || r.Resolver == nil {
-		return false
+func (r *PublicDNSResolver) Lookup(ctx context.Context, name string) DNSLookupResult {
+	result := DNSLookupResult{Hostname: name}
+	addresses, err := r.LookupHost(ctx, name)
+	result.Classification = ClassifyDNSError(err)
+	if err != nil {
+		result.Error = err.Error()
+		return result
 	}
-	_, err := r.Resolver.LookupHost(ctx, name)
-	return err == nil
+	result.Addresses = addresses
+	result.Classification = DNSLookupFound
+	return result
 }
 
 func normalizeCnameHost(host string) string {
-	host = strings.TrimSpace(host)
-	host = strings.TrimSuffix(host, ".")
-	return host
+	return dnsverify.NormalizeCnameHost(host)
 }
 
 func cnameTargetMatches(resolved, expected string) bool {
-	resolved = normalizeCnameHost(resolved)
-	expected = normalizeCnameHost(expected)
-	if resolved == "" || expected == "" {
-		return false
-	}
-	if strings.EqualFold(resolved, expected) {
-		return true
-	}
-	return strings.HasSuffix(strings.ToLower(resolved), "."+strings.ToLower(expected))
+	return dnsverify.CnameTargetMatches(resolved, expected)
 }
 
 func BuildCnameCheckResult(apiStatus, expected, resolved, resolveErr string) *CnameCheckResult {

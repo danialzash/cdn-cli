@@ -58,29 +58,50 @@ func TestClassifyHTTPStatus(t *testing.T) {
 	}
 }
 
-func TestCloudProxyStrongEvidence(t *testing.T) {
-	withEdge := &State{
-		Domain: DomainSummary{CnameTarget: "edge.cdn.net"},
-		HTTPSProbe: &HTTPProbeResult{
-			AnalysisHeaders: map[string]string{"x-poweredby": "VergeCloud"},
+func TestCloudProxyStrongEvidencePerHostname(t *testing.T) {
+	apex := "example.com"
+	apiHost := "api.example.com"
+	withApexOnly := &State{
+		Domain: DomainSummary{Name: apex, CnameTarget: "edge.cdn.net"},
+		HostEdgeProbes: map[string]*HTTPProbeResult{
+			apex: {AnalysisHeaders: map[string]string{"x-poweredby": "VergeCloud"}},
 		},
 	}
-	if !cloudProxyStrongEvidence(withEdge, dnsverify.Result{Actual: "1.2.3.4", Status: "ok"}) {
-		t.Fatal("edge header should be strong evidence")
+	strong, source := cloudProxyStrongEvidenceForRecord(withApexOnly, dnsverify.Result{Name: "api", Actual: "1.2.3.4", Status: "ok"}, apiHost)
+	if strong || source != "none" {
+		t.Fatalf("apex evidence must not validate api subdomain: strong=%v source=%q", strong, source)
 	}
-	withoutEdge := &State{Domain: DomainSummary{CnameTarget: "edge.cdn.net"}}
-	if cloudProxyStrongEvidence(withoutEdge, dnsverify.Result{Actual: "1.2.3.4", Status: "ok"}) {
-		t.Fatal("resolution alone must not be strong evidence")
+
+	withAPIProbe := &State{
+		Domain: DomainSummary{Name: apex, CnameTarget: "edge.cdn.net"},
+		HostEdgeProbes: map[string]*HTTPProbeResult{
+			apiHost: {AnalysisHeaders: map[string]string{"x-poweredby": "VergeCloud"}},
+		},
+	}
+	strong, source = cloudProxyStrongEvidenceForRecord(withAPIProbe, dnsverify.Result{Name: "api", Actual: "1.2.3.4", Status: "ok"}, apiHost)
+	if !strong || source != "hostname-edge-probe" {
+		t.Fatalf("api hostname probe should validate api only: strong=%v source=%q", strong, source)
+	}
+
+	withCNAME := &State{
+		Domain: DomainSummary{Name: apex, CnameTarget: "edge.cdn.net"},
+		HostCNAMEChains: map[string][]string{
+			apiHost: {"edge.cdn.net"},
+		},
+	}
+	strong, source = cloudProxyStrongEvidenceForRecord(withCNAME, dnsverify.Result{Name: "api", Actual: "edge.cdn.net", Status: "ok"}, apiHost)
+	if !strong || source != "cname-target" {
+		t.Fatalf("cname chain should be strong evidence: strong=%v source=%q", strong, source)
 	}
 }
 
 func TestWWWResolutionOptional(t *testing.T) {
 	check := &DNSCheck{}
-	findings := check.resolutionFinding("dns.www-resolution", "www.example.com", false, false)
+	findings := check.lookupFinding("dns.www-resolution", "www.example.com", DNSLookupResult{Classification: DNSLookupNotFound}, false)
 	if findings[0].Status != StatusSkip {
 		t.Fatalf("got %q", findings[0].Status)
 	}
-	findings = check.resolutionFinding("dns.www-resolution", "www.example.com", false, true)
+	findings = check.lookupFinding("dns.www-resolution", "www.example.com", DNSLookupResult{Classification: DNSLookupNotFound}, true)
 	if findings[0].Status != StatusFail {
 		t.Fatalf("got %q", findings[0].Status)
 	}
@@ -114,19 +135,19 @@ func TestFixUnknownIDReturnsError(t *testing.T) {
 }
 
 type mockFixApplier struct {
-	applyErr error
-	verifyOK bool
+	applyErr  error
+	verify    FixVerification
 	verifyMsg string
 	verifyErr error
 }
 
 func (m *mockFixApplier) ApplyFix(context.Context, string, FixPlan) error { return m.applyErr }
-func (m *mockFixApplier) VerifyFix(context.Context, string, FixPlan) (bool, string, error) {
-	return m.verifyOK, m.verifyMsg, m.verifyErr
+func (m *mockFixApplier) VerifyFix(context.Context, string, FixPlan) (FixVerification, string, error) {
+	return m.verify, m.verifyMsg, m.verifyErr
 }
 
 func TestFixVerificationFailure(t *testing.T) {
-	runner := NewFixRunner(&mockFixApplier{}, &mockFixApplier{verifyOK: false, verifyMsg: "still enabled"})
+	runner := NewFixRunner(&mockFixApplier{}, &mockFixApplier{verify: FixVerification{ConfigurationVerified: false}, verifyMsg: "still enabled"})
 	results := runner.Apply(context.Background(), "example.com", []FixPlan{{ID: "cache.developer-mode", Description: "x", Safety: FixSafetySafe, Automatic: true}}, false)
 	if len(results) != 1 || results[0].Verified || results[0].Error == "" {
 		t.Fatalf("got %+v", results)
@@ -137,9 +158,20 @@ func TestFixVerificationFailure(t *testing.T) {
 }
 
 func TestFixVerificationSuccess(t *testing.T) {
-	runner := NewFixRunner(&mockFixApplier{}, &mockFixApplier{verifyOK: true})
+	runner := NewFixRunner(&mockFixApplier{}, &mockFixApplier{verify: FixVerification{ConfigurationVerified: true, BehaviorVerified: true}})
 	results := runner.Apply(context.Background(), "example.com", []FixPlan{{ID: "cache.developer-mode", Description: "x", Safety: FixSafetySafe, Automatic: true}}, false)
 	if len(results) != 1 || !results[0].Verified || results[0].Error != "" {
+		t.Fatalf("got %+v", results)
+	}
+}
+
+func TestHTTPSRedirectFixRequiresBehaviorVerification(t *testing.T) {
+	runner := NewFixRunner(&mockFixApplier{}, &mockFixApplier{
+		verify:    FixVerification{ConfigurationVerified: true, BehaviorVerified: false},
+		verifyMsg: "live redirect missing",
+	})
+	results := runner.Apply(context.Background(), "example.com", []FixPlan{{ID: "ssl.https-redirect", Description: "Enable HTTPS redirect", Safety: FixSafetySafe, Automatic: true}}, false)
+	if len(results) != 1 || results[0].Verified || !strings.Contains(results[0].Error, "live redirect") {
 		t.Fatalf("got %+v", results)
 	}
 }
@@ -373,7 +405,7 @@ func TestConfigurationActiveCertificateCount(t *testing.T) {
 }
 
 func TestRedirectDowngradeDetected(t *testing.T) {
-	ev := buildRedirectEvidence("https://example.com", []string{"http://example.com/"}, "http://example.com/", 200, nil)
+	ev := buildRedirectEvidence("https://example.com", []string{"http://example.com/"}, "http://example.com/", 200, nil, "example.com")
 	if !ev.DowngradeDetected {
 		t.Fatal("expected downgrade")
 	}
@@ -382,9 +414,9 @@ func TestRedirectDowngradeDetected(t *testing.T) {
 func TestCacheRepeatedRequestWording(t *testing.T) {
 	check := &CacheCheck{}
 	findings := check.Run(context.Background(), &State{
-		Domain: DomainSummary{Name: "example.com"},
-		Inspect: &client.DomainInspect{Cache: client.CacheInspect{Status: "on", MaxAge: "3600"}},
-		HTTPSProbe: &HTTPProbeResult{Headers: map[string]string{"x-cache-status": "MISS"}},
+		Domain:           DomainSummary{Name: "example.com"},
+		Inspect:          &client.DomainInspect{Cache: client.CacheInspect{Status: "on", MaxAge: "3600"}},
+		HTTPSProbe:       &HTTPProbeResult{Headers: map[string]string{"x-cache-status": "MISS"}},
 		SecondHTTPSProbe: &HTTPProbeResult{Headers: map[string]string{"x-cache-status": "MISS"}},
 	})
 	for _, f := range findings {

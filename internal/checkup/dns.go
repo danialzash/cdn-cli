@@ -17,18 +17,28 @@ func (c *DNSCheck) Run(_ context.Context, state *State) []Finding {
 	var findings []Finding
 	domain := state.Domain.Name
 
-	findings = append(findings, c.resolutionFinding(
+	if HasInspectSectionError(state.Inspect, "dns") {
+		errs := InspectSectionErrors(state.Inspect, "dns")
+		for _, errItem := range errs {
+			f := inspectSectionErrorFinding("dns.api", string(CategoryDNS), errItem.Section, "DNS configuration")
+			f.Evidence["error"] = errItem.Error
+			findings = append(findings, f)
+		}
+		return findings
+	}
+
+	findings = append(findings, c.lookupFinding(
 		"dns.apex-resolution",
 		domain,
-		state.ApexResolution,
+		state.ApexLookup,
 		true,
 	)...)
 
 	wwwName := "www." + domain
-	findings = append(findings, c.resolutionFinding(
+	findings = append(findings, c.lookupFinding(
 		"dns.www-resolution",
 		wwwName,
-		state.WWWResolution,
+		state.WWWLookup,
 		state.WWWRequired,
 	)...)
 
@@ -39,7 +49,7 @@ func (c *DNSCheck) Run(_ context.Context, state *State) []Finding {
 	return findings
 }
 
-func (c *DNSCheck) resolutionFinding(id, name string, resolved, required bool) []Finding {
+func (c *DNSCheck) lookupFinding(id, name string, lookup DNSLookupResult, required bool) []Finding {
 	f := Finding{
 		ID:       id,
 		Category: string(CategoryDNS),
@@ -52,14 +62,32 @@ func (c *DNSCheck) resolutionFinding(id, name string, resolved, required bool) [
 		f.Summary = "No www record is configured; the check was not required."
 		return []Finding{f}
 	}
-	if resolved {
+	if lookup.Hostname == "" {
+		lookup.Hostname = name
+	}
+	f.Evidence["classification"] = lookup.Classification
+	if lookup.Error != "" {
+		f.Evidence["error"] = lookup.Error
+	}
+	switch lookup.Classification {
+	case DNSLookupFound:
 		f.Status = StatusPass
 		f.Severity = SeverityInfo
 		f.Summary = fmt.Sprintf("%s resolves successfully.", name)
-	} else {
+	case DNSLookupNotFound:
 		f.Status = StatusFail
 		f.Severity = SeverityHigh
 		f.Summary = fmt.Sprintf("%s does not resolve.", name)
+	default:
+		if lookup.Classification.IsProbeError() {
+			f.Status = StatusError
+			f.Severity = SeverityMedium
+			f.Summary = fmt.Sprintf("DNS lookup for %s could not be completed.", name)
+		} else {
+			f.Status = StatusFail
+			f.Severity = SeverityHigh
+			f.Summary = fmt.Sprintf("%s does not resolve.", name)
+		}
 	}
 	return []Finding{f}
 }

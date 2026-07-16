@@ -8,13 +8,13 @@ import (
 )
 
 type PageRule struct {
-	ID          string `json:"id"`
-	Seq         int    `json:"seq"`
-	URL         string `json:"url"`
-	Enabled     bool   `json:"enabled"`
-	IsProtected bool   `json:"is_protected"`
-	CacheLevel  string `json:"cache_level,omitempty"`
-	CacheMaxAge string `json:"cache_max_age,omitempty"`
+	ID          string          `json:"id"`
+	Seq         int             `json:"seq"`
+	URL         string          `json:"url"`
+	Enabled     bool            `json:"enabled"`
+	IsProtected bool            `json:"is_protected"`
+	CacheLevel  string          `json:"cache_level,omitempty"`
+	CacheMaxAge string          `json:"cache_max_age,omitempty"`
 	Raw         json.RawMessage `json:"raw,omitempty"`
 }
 

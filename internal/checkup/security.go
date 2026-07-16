@@ -36,6 +36,17 @@ func (c *SecurityCheck) Run(_ context.Context, state *State) []Finding {
 }
 
 func (c *SecurityCheck) wafFinding(domain string, state *State) []Finding {
+	if HasInspectSectionError(state.Inspect, "waf") {
+		errs := InspectSectionErrors(state.Inspect, "waf")
+		var findings []Finding
+		for _, errItem := range errs {
+			f := inspectSectionErrorFinding("security.waf-api", string(CategorySecurity), errItem.Section, "WAF configuration")
+			f.Evidence["error"] = errItem.Error
+			findings = append(findings, f)
+		}
+		return findings
+	}
+
 	mode := strings.ToLower(state.Inspect.WAF.Mode)
 	f := Finding{
 		ID:       "security.waf-mode",
@@ -43,9 +54,9 @@ func (c *SecurityCheck) wafFinding(domain string, state *State) []Finding {
 		Title:    "WAF mode",
 		Severity: SeverityInfo,
 		Evidence: map[string]any{
-			"mode":            mode,
-			"enabled":         state.Inspect.WAF.Enabled,
-			"package_count":   state.Inspect.WAF.PackageCount,
+			"mode":          mode,
+			"enabled":       state.Inspect.WAF.Enabled,
+			"package_count": state.Inspect.WAF.PackageCount,
 		},
 	}
 	switch mode {
@@ -67,6 +78,21 @@ func (c *SecurityCheck) wafFinding(domain string, state *State) []Finding {
 }
 
 func (c *SecurityCheck) firewallFinding(state *State) []Finding {
+	var findings []Finding
+	if HasInspectSectionError(state.Inspect, "firewall_settings", "firewall_rules") {
+		for _, errItem := range InspectSectionErrors(state.Inspect, "firewall_settings", "firewall_rules") {
+			id := FindingID("security", errItem.Section, "api")
+			title := "Firewall configuration"
+			if errItem.Section == "firewall_rules" {
+				title = "Firewall rules"
+			}
+			f := inspectSectionErrorFinding(id, string(CategorySecurity), errItem.Section, title)
+			f.Evidence["error"] = errItem.Error
+			findings = append(findings, f)
+		}
+		return findings
+	}
+
 	fw := state.Inspect.Firewall
 	f := Finding{
 		ID:       "security.firewall",
@@ -87,7 +113,7 @@ func (c *SecurityCheck) firewallFinding(state *State) []Finding {
 		f.Status = StatusWarn
 		f.Summary = "Firewall is disabled."
 	}
-	findings := []Finding{f}
+	findings = append(findings, f)
 	if !fw.VerifySNI {
 		findings = append(findings, Finding{
 			ID:       "security.verify-sni",
@@ -108,18 +134,37 @@ func (c *SecurityCheck) hstsFinding(domain string, state *State) []Finding {
 		Title:    "HSTS",
 		Severity: SeverityMedium,
 	}
-	apiEnabled := state.Inspect.SSL.HSTS
 	header := ""
-	if state.HTTPSProbe != nil {
+	if state.HTTPSProbe != nil && state.HTTPSProbe.Error == "" {
 		header = state.HTTPSProbe.Headers["strict-transport-security"]
+	}
+
+	sslAPIAvailable := state.Inspect != nil && !HasInspectSectionError(state.Inspect, "ssl")
+	apiEnabled := false
+	if sslAPIAvailable {
+		apiEnabled = state.Inspect.SSL.HSTS
 	}
 	f.Evidence = map[string]any{
 		"api_enabled": apiEnabled,
 		"header":      header,
 	}
 
-	httpsOK := state.HTTPSProbe != nil && state.HTTPSProbe.Error == ""
-	tlsOK := state.TLSProbe != nil && state.TLSProbe.HostnameMatch && !state.TLSProbe.Expired
+	httpsOK := state.HTTPSProbe != nil && state.HTTPSProbe.Error == "" && !state.HTTPSProbe.ProbeExecError
+	tlsOK := state.TLSProbe != nil && state.TLSProbe.Connected && state.TLSProbe.HostnameMatch && !state.TLSProbe.Expired
+
+	if !sslAPIAvailable {
+		if header != "" {
+			f.Status = StatusPass
+			f.Summary = "Strict-Transport-Security header was observed on the public HTTPS response."
+		} else if httpsOK {
+			f.Status = StatusSkip
+			f.Summary = "HSTS API comparison skipped because SSL configuration could not be loaded."
+		} else {
+			f.Status = StatusSkip
+			f.Summary = "HSTS check skipped because HTTPS is unavailable."
+		}
+		return []Finding{f}
+	}
 
 	if apiEnabled && header == "" && httpsOK {
 		f.Status = StatusWarn
@@ -145,7 +190,7 @@ func (c *SecurityCheck) hstsFinding(domain string, state *State) []Finding {
 }
 
 func (c *SecurityCheck) securityHeadersFinding(state *State) []Finding {
-	if state.HTTPSProbe == nil {
+	if state.HTTPSProbe == nil || state.HTTPSProbe.Error != "" || state.HTTPSProbe.ProbeExecError {
 		return nil
 	}
 	analysis := state.HTTPSProbe.AnalysisHeaders

@@ -45,26 +45,26 @@ var safeHeaderAllowlist = map[string]struct{}{
 }
 
 var analysisHeaderAllowlist = map[string]struct{}{
-	"content-security-policy":           {},
-	"x-content-type-options":            {},
-	"referrer-policy":                   {},
-	"permissions-policy":                {},
-	"x-frame-options":                   {},
-	"cross-origin-opener-policy":        {},
-	"cross-origin-resource-policy":      {},
-	"cross-origin-embedder-policy":      {},
-	"strict-transport-security":         {},
-	"cache-control":                     {},
-	"age":                               {},
-	"vary":                              {},
-	"x-cache":                           {},
-	"x-cache-status":                    {},
-	"x-poweredby":                       {},
-	"x-powered-by":                      {},
-	"x-request-id":                      {},
-	"x-verge-request-id":                {},
-	"server":                            {},
-	"via":                               {},
+	"content-security-policy":      {},
+	"x-content-type-options":       {},
+	"referrer-policy":              {},
+	"permissions-policy":           {},
+	"x-frame-options":              {},
+	"cross-origin-opener-policy":   {},
+	"cross-origin-resource-policy": {},
+	"cross-origin-embedder-policy": {},
+	"strict-transport-security":    {},
+	"cache-control":                {},
+	"age":                          {},
+	"vary":                         {},
+	"x-cache":                      {},
+	"x-cache-status":               {},
+	"x-poweredby":                  {},
+	"x-powered-by":                 {},
+	"x-request-id":                 {},
+	"x-verge-request-id":           {},
+	"server":                       {},
+	"via":                          {},
 }
 
 func FilterSafeHeaders(headers http.Header) map[string]string {
@@ -160,11 +160,11 @@ func ProbeHTTP(ctx context.Context, client *http.Client, rawURL string, hostHead
 	}
 
 	var (
-		dnsStart, dnsDone           time.Time
-		connectStart, connectDone   time.Time
-		tlsStart, tlsDone           time.Time
-		gotFirstResponse            time.Time
-		start                       = time.Now()
+		dnsStart, dnsDone         time.Time
+		connectStart, connectDone time.Time
+		tlsStart, tlsDone         time.Time
+		gotFirstResponse          time.Time
+		start                     = time.Now()
 	)
 
 	trace := &httptrace.ClientTrace{
@@ -216,7 +216,7 @@ func ProbeHTTP(ctx context.Context, client *http.Client, rawURL string, hostHead
 			result.ProbeExecError = true
 		}
 		result.Error = err.Error()
-		result.RedirectEvidence = buildRedirectEvidence(rawURL, redirects, "", 0, result)
+		result.RedirectEvidence = buildRedirectEvidence(rawURL, redirects, "", 0, result, "")
 		return result
 	}
 	defer resp.Body.Close()
@@ -226,13 +226,13 @@ func ProbeHTTP(ctx context.Context, client *http.Client, rawURL string, hostHead
 	result.RedirectChain = redirects
 	result.Headers = FilterSafeHeaders(resp.Header)
 	result.AnalysisHeaders = FilterAnalysisHeaders(resp.Header)
-	result.RedirectEvidence = buildRedirectEvidence(rawURL, redirects, result.FinalURL, result.StatusCode, result)
+	result.RedirectEvidence = buildRedirectEvidence(rawURL, redirects, result.FinalURL, result.StatusCode, result, resp.Request.URL.Hostname())
 
 	_, _ = io.CopyN(io.Discard, resp.Body, maxBodyRead)
 	return result
 }
 
-func buildRedirectEvidence(initial string, chain []string, final string, status int, probe *HTTPProbeResult) RedirectEvidence {
+func buildRedirectEvidence(initial string, chain []string, final string, status int, probe *HTTPProbeResult, domain string) RedirectEvidence {
 	ev := RedirectEvidence{
 		InitialURL:       initial,
 		RedirectChain:    append([]string(nil), chain...),
@@ -241,29 +241,44 @@ func buildRedirectEvidence(initial string, chain []string, final string, status 
 		LoopDetected:     probe != nil && probe.RedirectLoop,
 		TooManyRedirects: probe != nil && probe.TooManyRedirects,
 	}
-	baseHost := registrableHost(initial)
+
 	for _, hop := range chain {
-		if host := registrableHost(hop); host != "" && baseHost != "" && host != baseHost && !hostsEquivalent(baseHost, host) {
+		if host := redirectHost(hop); host != "" && !hostsRelated(domain, host) {
 			ev.UnexpectedHosts = appendUnique(ev.UnexpectedHosts, host)
-		}
-		prevScheme := schemeOf(initial)
-		for i, hop := range chain {
-			curScheme := schemeOf(hop)
-			if i == 0 {
-				prevScheme = schemeOf(initial)
-			}
-			if prevScheme == "https" && curScheme == "http" {
-				ev.DowngradeDetected = true
-			}
-			prevScheme = curScheme
 		}
 	}
+
+	previousScheme := schemeOf(initial)
+	for _, hop := range chain {
+		curScheme := schemeOf(hop)
+		if previousScheme == "https" && curScheme == "http" {
+			ev.DowngradeDetected = true
+		}
+		previousScheme = curScheme
+	}
+
 	if final != "" {
-		if host := registrableHost(final); host != "" && baseHost != "" && host != baseHost && !hostsEquivalent(baseHost, host) {
+		if host := redirectHost(final); host != "" && !hostsRelated(domain, host) {
 			ev.UnexpectedHosts = appendUnique(ev.UnexpectedHosts, host)
+		}
+		finalScheme := schemeOf(final)
+		if previousScheme == "https" && finalScheme == "http" {
+			ev.DowngradeDetected = true
 		}
 	}
 	return ev
+}
+
+func redirectHost(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
+}
+
+func hostsRelated(domain, host string) bool {
+	return relatedHost(domain, host)
 }
 
 func appendUnique(list []string, value string) []string {

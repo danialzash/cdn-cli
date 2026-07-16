@@ -25,7 +25,7 @@ type FixApplier interface {
 
 // FixVerifier confirms a fix reached the desired state.
 type FixVerifier interface {
-	VerifyFix(ctx context.Context, domain string, plan FixPlan) (verified bool, message string, err error)
+	VerifyFix(ctx context.Context, domain string, plan FixPlan) (FixVerification, string, error)
 }
 
 type State struct {
@@ -50,11 +50,21 @@ type State struct {
 
 	ProbeErrors []ProbeError
 
-	ApexResolution bool
-	WWWResolution  bool
-	WWWRequired    bool
+	HostEdgeProbes       map[string]*HTTPProbeResult
+	HostCNAMEChains      map[string][]string
+	OriginSchemeAttempts []OriginSchemeAttempt
+
+	ApexLookup  DNSLookupResult
+	WWWLookup   DNSLookupResult
+	WWWRequired bool
 
 	mu sync.RWMutex
+}
+
+type OriginSchemeAttempt struct {
+	Scheme string `json:"scheme"`
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
 }
 
 func (s *State) AddProbeError(probe, message string) {

@@ -51,13 +51,14 @@ func (fr *FixRunner) Apply(ctx context.Context, domain string, plans []FixPlan, 
 			results = append(results, result)
 			continue
 		}
-		verified, message, err := fr.verifier.VerifyFix(ctx, domain, plan)
+		verification, message, err := fr.verifier.VerifyFix(ctx, domain, plan)
 		if err != nil {
 			result.Error = err.Error()
 			results = append(results, result)
 			continue
 		}
-		if !verified {
+		result.Verification = verification
+		if !verification.ConfigurationVerified || !verificationBehaviorRequired(plan, verification) {
 			if message == "" {
 				message = "expected state was not confirmed after applying fix"
 			}
@@ -70,6 +71,15 @@ func (fr *FixRunner) Apply(ctx context.Context, domain string, plans []FixPlan, 
 		results = append(results, result)
 	}
 	return results
+}
+
+func verificationBehaviorRequired(plan FixPlan, verification FixVerification) bool {
+	switch plan.ID {
+	case "ssl.https-redirect":
+		return verification.BehaviorVerified
+	default:
+		return true
+	}
 }
 
 func FixFailed(results []FixResult) bool {

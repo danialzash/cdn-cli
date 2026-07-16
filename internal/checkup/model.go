@@ -106,12 +106,18 @@ type FixPlan struct {
 }
 
 type FixResult struct {
-	FixID    string `json:"fix_id"`
-	Applied  bool   `json:"applied"`
-	Verified bool   `json:"verified"`
-	DryRun   bool   `json:"dry_run"`
-	Message  string `json:"message"`
-	Error    string `json:"error,omitempty"`
+	FixID        string          `json:"fix_id"`
+	Applied      bool            `json:"applied"`
+	Verified     bool            `json:"verified"`
+	DryRun       bool            `json:"dry_run"`
+	Message      string          `json:"message"`
+	Error        string          `json:"error,omitempty"`
+	Verification FixVerification `json:"verification,omitempty"`
+}
+
+type FixVerification struct {
+	ConfigurationVerified bool `json:"configuration_verified"`
+	BehaviorVerified      bool `json:"behavior_verified"`
 }
 
 type ProbeError struct {
@@ -120,14 +126,14 @@ type ProbeError struct {
 }
 
 type DomainSummary struct {
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	Status          string   `json:"status"`
-	Type            string   `json:"type"`
-	CnameTarget     string   `json:"cname_target,omitempty"`
-	CustomCname     string   `json:"custom_cname,omitempty"`
-	NSKeys          []string `json:"ns_keys,omitempty"`
-	Restrictions    []string `json:"restrictions,omitempty"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Status       string   `json:"status"`
+	Type         string   `json:"type"`
+	CnameTarget  string   `json:"cname_target,omitempty"`
+	CustomCname  string   `json:"custom_cname,omitempty"`
+	NSKeys       []string `json:"ns_keys,omitempty"`
+	Restrictions []string `json:"restrictions,omitempty"`
 }
 
 type Summary struct {

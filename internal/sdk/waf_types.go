@@ -6,8 +6,8 @@ type WafPackageProvider struct {
 }
 
 type WafRulesetRule struct {
-	ID   string         `json:"id"`
-	Name string         `json:"name"`
+	ID     string         `json:"id"`
+	Name   string         `json:"name"`
 	Params map[string]any `json:"params,omitempty"`
 }
 

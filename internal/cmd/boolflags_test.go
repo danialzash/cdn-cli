@@ -40,8 +40,8 @@ func TestCacheUpdateDeveloperModeExplicitFalse(t *testing.T) {
 
 func TestSslUpdateHTTPSRedirectExplicitValues(t *testing.T) {
 	for _, tc := range []struct {
-		raw   string
-		want  bool
+		raw  string
+		want bool
 	}{
 		{"true", true},
 		{"false", false},
