@@ -320,7 +320,37 @@ verge cache purge example.com --purge individual --purge-urls https://example.co
 verge cache purge example.com --purge individual --purge-urls https://a.example.com/x --purge-urls https://b.example.com/y
 ```
 
-### 10. Manage DNS records
+### 10. Acceleration settings
+
+Get acceleration settings:
+
+```bash
+verge acceleration example.com
+```
+
+Update acceleration settings:
+
+```bash
+verge acceleration update example.com --status on
+verge acceleration update example.com --extensions css,js
+verge acceleration update example.com --status on --extensions css --extensions js
+```
+
+Get image resize settings:
+
+```bash
+verge acceleration image-resize example.com
+```
+
+Update image resize settings:
+
+```bash
+verge acceleration image-resize update example.com --status on
+verge acceleration image-resize update example.com --height-by height --width-by width
+verge acceleration image-resize update example.com --mode short-side --mode-by mode --quality-by quality
+```
+
+### 11. Manage DNS records
 
 List all records with full values:
 
@@ -368,7 +398,7 @@ verge dns verify example.com --workers 20
 verge dns verify example.com --record-id <record-id>
 ```
 
-### 11. Run smart check
+### 12. Run smart check
 
 ```bash
 verge troubleshoot smartcheck example.com
@@ -433,6 +463,11 @@ verge page-rules delete <domain> <rule-id> [--force]
 verge cache <domain>
 verge cache update <domain> [--developer-mode] [--consistent-uptime] [--max-size <bytes>] [--status off|uri|query_string] [--max-age <duration>] [--page-any <duration>] [--browser <duration>] [--scheme] [--bypass-on-cookie] [--cookie <names>] [--args] [--arg <names>]
 verge cache purge <domain> [--purge all|individual|tags] [--purge-urls <url>...] [--purge-tags <tag>...]
+
+verge acceleration <domain>
+verge acceleration update <domain> [--status on|off] [--extensions <ext>...]
+verge acceleration image-resize <domain>
+verge acceleration image-resize update <domain> [--status on|off] [--height-by <name>] [--width-by <name>] [--mode freely|short-side|long-side] [--mode-by <name>] [--quality-by <name>]
 
 verge dns list <domain>
 verge dns get <domain> <record-id>

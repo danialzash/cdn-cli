@@ -186,3 +186,30 @@ type Acceleration struct {
 type AccelerationResponse struct {
 	Data Acceleration `json:"data"`
 }
+
+type UpdateAccelerationRequest struct {
+	Status     *string  `json:"status,omitempty"`
+	Extensions []string `json:"extensions,omitempty"`
+}
+
+type ImageResize struct {
+	Status    string `json:"status"`
+	HeightBy  string `json:"height_by"`
+	WidthBy   string `json:"width_by"`
+	Mode      string `json:"mode"`
+	ModeBy    string `json:"mode_by"`
+	QualityBy string `json:"quality_by"`
+}
+
+type ImageResizeResponse struct {
+	Data ImageResize `json:"data"`
+}
+
+type UpdateImageResizeRequest struct {
+	Status    *string `json:"status,omitempty"`
+	HeightBy  *string `json:"height_by,omitempty"`
+	WidthBy   *string `json:"width_by,omitempty"`
+	Mode      *string `json:"mode,omitempty"`
+	ModeBy    *string `json:"mode_by,omitempty"`
+	QualityBy *string `json:"quality_by,omitempty"`
+}

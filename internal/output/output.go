@@ -175,6 +175,40 @@ func (p *Printer) PrintCacheSettings(settings *client.CacheSettings) error {
 	return nil
 }
 
+func (p *Printer) PrintAccelerationSettings(settings *client.AccelerationSettings) error {
+	if p.JSON {
+		return p.PrintJSON(settings)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("Acceleration Settings"))
+	table := p.newTable([]string{"FIELD", "VALUE"})
+	table.Append([]string{"Status", emptyDash(settings.Status)})
+	extensions := "-"
+	if len(settings.Extensions) > 0 {
+		extensions = strings.Join(settings.Extensions, ", ")
+	}
+	table.Append([]string{"Extensions", extensions})
+	table.Render()
+	return nil
+}
+
+func (p *Printer) PrintImageResizeSettings(settings *client.ImageResizeSettings) error {
+	if p.JSON {
+		return p.PrintJSON(settings)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("Image Resize Settings"))
+	table := p.newTable([]string{"FIELD", "VALUE"})
+	table.Append([]string{"Status", emptyDash(settings.Status)})
+	table.Append([]string{"Height By", emptyDash(settings.HeightBy)})
+	table.Append([]string{"Width By", emptyDash(settings.WidthBy)})
+	table.Append([]string{"Mode", emptyDash(settings.Mode)})
+	table.Append([]string{"Mode By", emptyDash(settings.ModeBy)})
+	table.Append([]string{"Quality By", emptyDash(settings.QualityBy)})
+	table.Render()
+	return nil
+}
+
 func (p *Printer) PrintPageRules(rules []client.PageRule) error {
 	if p.JSON {
 		return p.PrintJSON(rules)

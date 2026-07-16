@@ -71,11 +71,3 @@ func (c *Client) ListRateLimitRules(ctx context.Context, domain string, page, pe
 	}
 	return &resp, nil
 }
-
-func (c *Client) GetAcceleration(ctx context.Context, domain string) (*Acceleration, error) {
-	var resp AccelerationResponse
-	if err := c.get(ctx, "/acceleration/"+url.PathEscape(domain), nil, &resp); err != nil {
-		return nil, err
-	}
-	return &resp.Data, nil
-}
