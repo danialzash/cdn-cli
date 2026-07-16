@@ -23,7 +23,8 @@ type DynamicFieldValue struct {
 }
 
 type DynamicFieldResponse struct {
-	Data DynamicField `json:"data"`
+	Data    DynamicField `json:"data"`
+	Message string       `json:"message,omitempty"`
 }
 
 type DynamicFieldData struct {
