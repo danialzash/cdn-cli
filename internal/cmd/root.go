@@ -26,10 +26,54 @@ func NewRootCmd() *cobra.Command {
 		Short: "VergeCloud CDN CLI",
 		Long: `verge is a command-line interface for the VergeCloud CDN API.
 
-Manage domains, DNS records, firewall rules, page rules, cache settings, acceleration, lists, SSL/TLS, reports, WAF packages, and diagnostics
-from your terminal. Run "man verge" for full documentation after installation.
+Configuration is stored in ~/.config/vergecloud/config.yaml.
+Authenticate with: verge auth login --api-key KEY
 
-Configuration is stored in ~/.config/vergecloud/config.yaml.`,
+COMMAND GROUPS
+
+  auth              Login, logout, and check authentication status
+  domains           List, get, and inspect domains
+  dns               List, add, update, delete, and verify DNS records
+  firewall          Manage firewall rules (list, get, add, update, delete)
+  page-rules        Manage page rules
+  cache             View, update, and purge cache settings
+  acceleration      View and update acceleration and image resize settings
+  lists             Manage IP and value lists
+  ssl               SSL/TLS settings, certificates, and managed orders
+  reports           Analytics and traffic reports with terminal charts
+  waf               WAF package catalog, domain settings, and mode updates
+  troubleshoot      Run smart check diagnostics
+  version           Print CLI version
+
+REPORTS
+
+  verge reports list
+  verge reports traffic DOMAIN [--period 24h|7d|30d]
+  verge reports request-summary DOMAIN   Request saved/missed/bypassed breakdown
+  verge reports traffic-summary DOMAIN   Traffic saved/missed/bypassed breakdown
+  verge reports traffic-saved DOMAIN     Both request and traffic summaries
+  verge reports status DOMAIN              HTTP status code reports
+  verge reports visitors DOMAIN
+  verge reports attacks DOMAIN
+  verge reports aggregated details --domains a.com,b.com
+  verge reports domains-download [--output file.csv]
+
+WAF
+
+  verge waf packages                       List global packages (crs, comodo, default)
+  verge waf get PACKAGE-ID                 Package details and rulesets
+  verge waf DOMAIN                         Domain WAF configuration
+  verge waf update DOMAIN --mode MODE      Update mode (off, detect, protect)
+
+GLOBAL FLAGS
+
+  --json      Output raw JSON instead of formatted tables
+  --verbose   Log HTTP requests to stderr
+  --api-url   Override API base URL
+  --api-key   Override API key for a single command
+  --token     Override bearer token for a single command
+
+See also: man verge-reports, man verge-waf, man verge-ssl, man verge-dns`,
 	}
 
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")

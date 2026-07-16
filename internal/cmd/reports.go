@@ -22,10 +22,14 @@ Each report type is a separate subcommand. Common flags:
   --filter-subdomain for subdomain-scoped reports
 
 Examples:
+  verge reports list
   verge reports traffic example.com --period 24h
+  verge reports request-summary example.com --period 30d
+  verge reports traffic-summary example.com --period 30d
   verge reports status example.com --period 7d
-  verge reports transport-layer-proxy example.com <proxy-id> --period 24h
-  verge reports list`,
+  verge reports transport-layer-proxy DOMAIN PROXY-ID --period 24h
+  verge reports aggregated details --domains a.com,b.com --period 24h
+  verge reports domains-download --output domains.csv`,
 	}
 
 	cmd.AddCommand(newReportsListCmd())
