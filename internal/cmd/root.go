@@ -9,6 +9,7 @@ import (
 	"github.com/vergecloud/cdn-cli/internal/client"
 	"github.com/vergecloud/cdn-cli/internal/config"
 	"github.com/vergecloud/cdn-cli/internal/output"
+	"github.com/vergecloud/cdn-cli/internal/update"
 	"github.com/vergecloud/cdn-cli/internal/version"
 )
 
@@ -27,7 +28,14 @@ func NewRootCmd() *cobra.Command {
 		Long: `verge is a command-line interface for the VergeCloud CDN API.
 
 Configuration is stored in ~/.config/vergecloud/config.yaml.
-Authenticate with: verge auth login --api-key KEY
+
+GETTING STARTED
+
+  verge getting-started         Install, login, and first commands
+  verge auth api-key            Create an API key at panel.vergecloud.dev
+  verge auth login --api-key KEY
+  verge auth login --token JWT
+  verge update                  Install the latest release
 
 COMMAND GROUPS
 
@@ -43,6 +51,8 @@ COMMAND GROUPS
   reports           Analytics and traffic reports with terminal charts
   waf               WAF package catalog, domain settings, and mode updates
   troubleshoot      Run smart check diagnostics
+  update            Check for and install CLI updates
+  getting-started   Install, authenticate, and first commands
   version           Print CLI version
 
 REPORTS
@@ -95,6 +105,8 @@ See also: man verge-reports, man verge-waf, man verge-ssl, man verge-dns`,
 		newListsCmd(),
 		newSslCmd(),
 		newReportsCmd(),
+		newUpdateCmd(),
+		newGettingStartedCmd(),
 		newVersionCmd(),
 	)
 
@@ -102,13 +114,33 @@ See also: man verge-reports, man verge-waf, man verge-ssl, man verge-dns`,
 }
 
 func newVersionCmd() *cobra.Command {
-	return &cobra.Command{
+	var checkUpdate bool
+
+	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print CLI version",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Printf("vergecloud-cli/%s\n", version.Version)
+			if !checkUpdate {
+				return
+			}
+			withContext(func(ctx context.Context) error {
+				info, err := update.Check(ctx)
+				if err != nil {
+					return err
+				}
+				if info.NeedsUpdate {
+					fmt.Printf("Update available: %s → %s (run: verge update)\n", info.Current, info.Latest)
+				} else {
+					fmt.Println("Up to date.")
+				}
+				return nil
+			})
 		},
 	}
+
+	cmd.Flags().BoolVar(&checkUpdate, "check", false, "Check GitHub for a newer release")
+	return cmd
 }
 
 func loadRuntimeConfig() (*config.Config, error) {

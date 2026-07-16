@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/vergecloud/cdn-cli/internal/client"
 	"github.com/vergecloud/cdn-cli/internal/config"
+	"github.com/vergecloud/cdn-cli/internal/help"
 	"github.com/vergecloud/cdn-cli/internal/sdk"
 )
 
@@ -16,8 +17,18 @@ func newAuthCmd() *cobra.Command {
 		Short: "Manage authentication",
 	}
 
-	cmd.AddCommand(newAuthLoginCmd(), newAuthStatusCmd(), newAuthLogoutCmd())
+	cmd.AddCommand(newAuthAPIKeyHelpCmd(), newAuthLoginCmd(), newAuthStatusCmd(), newAuthLogoutCmd())
 	return cmd
+}
+
+func newAuthAPIKeyHelpCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "api-key",
+		Short: "How to create an API key in the VergeCloud panel",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Print(help.APIKeyGuide())
+		},
+	}
 }
 
 func newAuthLoginCmd() *cobra.Command {
@@ -30,6 +41,8 @@ func newAuthLoginCmd() *cobra.Command {
 		Use:   "login",
 		Short: "Store credentials in local config",
 		Long: `Authenticate using either an API key or a bearer token.
+
+Need an API key? Run: verge auth api-key
 
 Provide exactly one credential type:
   verge auth login --api-key <key>
@@ -48,7 +61,7 @@ Provide exactly one credential type:
 				exitOnError(fmt.Errorf("provide only one credential: --api-key or --token"))
 			}
 			if key == "" && token == "" {
-				exitOnError(fmt.Errorf("credential required: use --api-key <key> or --token <jwt>"))
+				exitOnError(fmt.Errorf("credential required: use --api-key <key> or --token <jwt> (run `verge auth api-key` for help)"))
 			}
 
 			cfg, err := loadRuntimeConfig()

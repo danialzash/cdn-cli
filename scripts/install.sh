@@ -8,11 +8,21 @@ REPO="danialzash/cdn-cli"
 BINARY="verge"
 INSTALL_DIR="${INSTALL_DIR:-}"
 MAN_DIR="${MAN_DIR:-}"
+VERSION="${VERSION:-latest}"
 
 main() {
   need_cmd uname
   need_cmd mktemp
   need_cmd tar
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    SHA256_CMD="sha256sum"
+  elif command -v shasum >/dev/null 2>&1; then
+    SHA256_CMD="shasum -a 256"
+  else
+    echo "error: required command not found: sha256sum or shasum" >&2
+    exit 1
+  fi
 
   os="$(uname -s | tr '[:upper:]' '[:lower:]')"
   arch="$(uname -m)"
@@ -59,12 +69,33 @@ main() {
   trap 'rm -rf "$tmpdir"' EXIT
 
   archive="${BINARY}_${os}_${arch}.tar.gz"
-  url="https://github.com/${REPO}/releases/latest/download/${archive}"
+  if [ "$VERSION" = "latest" ]; then
+    base_url="https://github.com/${REPO}/releases/latest/download"
+  else
+    base_url="https://github.com/${REPO}/releases/download/${VERSION}"
+  fi
+  url="${base_url}/${archive}"
 
   echo "Downloading ${url} ..."
   if ! curl -fsSL "$url" -o "${tmpdir}/${archive}"; then
     echo "error: failed to download release asset" >&2
     echo "hint: check that a release exists at https://github.com/${REPO}/releases" >&2
+    exit 1
+  fi
+
+  echo "Verifying checksum ..."
+  if ! curl -fsSL "${base_url}/checksums.txt" -o "${tmpdir}/checksums.txt"; then
+    echo "error: failed to download checksums.txt" >&2
+    exit 1
+  fi
+  expected="$(grep " ${archive}$" "${tmpdir}/checksums.txt" | awk '{print $1}')"
+  if [ -z "$expected" ]; then
+    echo "error: checksum for ${archive} not found" >&2
+    exit 1
+  fi
+  actual="$($SHA256_CMD "${tmpdir}/${archive}" | awk '{print $1}')"
+  if [ "$actual" != "$expected" ]; then
+    echo "error: checksum mismatch for ${archive}" >&2
     exit 1
   fi
 
@@ -91,6 +122,7 @@ main() {
   echo ""
   echo "Next steps:"
   echo "  ${BINARY} version"
+  echo "  ${BINARY} auth api-key              # how to get an API key from the panel"
   echo "  ${BINARY} auth login --api-key <your-api-key>"
   if [ "$man_count" -gt 0 ]; then
     echo "  man ${BINARY}"
