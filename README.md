@@ -70,7 +70,7 @@ man verge
 
 ## Command groups
 
-`auth` · `domains` · `dns` · `firewall` · `page-rules` · `cache` · `acceleration` · `lists` · `ssl` · `reports` · `waf` · `troubleshoot` · `update` · `version`
+`auth` · `domains` · `dns` · `firewall` · `page-rules` · `cache` · `acceleration` · `lists` · `ssl` · `reports` · `waf` · `smartcheck` · `update` · `version`
 
 ## License
 

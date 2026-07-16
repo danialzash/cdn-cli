@@ -85,6 +85,7 @@ FIRST COMMANDS
   verge domains list
   verge dns list example.com
   verge reports traffic example.com --period 24h
+  verge smartcheck example.com
   verge --help`,
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Print(help.GettingStartedGuide())

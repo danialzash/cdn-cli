@@ -227,10 +227,10 @@ verge acceleration example.com
 verge lists list
 ```
 
-### Troubleshooting
+### Smart check
 
 ```bash
-verge troubleshoot smartcheck example.com
+verge smartcheck example.com
 ```
 
 ## Shell completion

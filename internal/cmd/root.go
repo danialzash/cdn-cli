@@ -50,7 +50,7 @@ COMMAND GROUPS
   ssl               SSL/TLS settings, certificates, and managed orders
   reports           Analytics and traffic reports with terminal charts
   waf               WAF package catalog, domain settings, and mode updates
-  troubleshoot      Run smart check diagnostics
+  smartcheck        Run smart check diagnostics for a domain
   update            Check for and install CLI updates
   getting-started   Install, authenticate, and first commands
   version           Print CLI version
@@ -86,7 +86,7 @@ See also: man verge-reports, man verge-waf, man verge-ssl, man verge-dns`,
 		newWafCmd(),
 		newFirewallCmd(),
 		newPageRulesCmd(),
-		newTroubleshootCmd(),
+		newSmartCheckCmd(),
 		newDNSCmd(),
 		newCacheCmd(),
 		newAccelerationCmd(),
