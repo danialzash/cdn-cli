@@ -39,15 +39,40 @@ func (r *Registry) validateDependencies() error {
 	return nil
 }
 
-func (r *Registry) ChecksForCategories(enabled map[Category]bool) ([]Check, error) {
+// Plan builds visible checks and merged data requirements for selected categories.
+// Dependencies control preparation only; prerequisite checks are not exposed as findings.
+func (r *Registry) Plan(enabled map[Category]bool) (ExecutionPlan, error) {
+	visible := make([]Check, 0)
 	selected := make(map[string]Check)
 	for _, check := range r.order {
 		if !enabled[check.Category()] {
 			continue
 		}
-		r.addWithDependencies(check.ID(), selected)
+		selected[check.ID()] = check
 	}
-	return r.sortSelected(selected)
+	ordered, err := r.sortSelected(selected)
+	if err != nil {
+		return ExecutionPlan{}, err
+	}
+	for _, check := range ordered {
+		if check.ID() == "domain.resolve" {
+			continue
+		}
+		visible = append(visible, check)
+	}
+	return ExecutionPlan{
+		VisibleChecks:     visible,
+		VisibleCategories: enabled,
+		Requirements:      RequirementsForCategories(enabled),
+	}, nil
+}
+
+func (r *Registry) ChecksForCategories(enabled map[Category]bool) ([]Check, error) {
+	plan, err := r.Plan(enabled)
+	if err != nil {
+		return nil, err
+	}
+	return plan.VisibleChecks, nil
 }
 
 func (r *Registry) addWithDependencies(id string, selected map[string]Check) {

@@ -48,16 +48,23 @@ func (c *OriginCheck) connectivityFinding(state *State) []Finding {
 		f.Summary = fmt.Sprintf("Origin probe failed: %s", state.OriginProbe.Error)
 		return []Finding{f}
 	}
-	f.Status = StatusPass
+	healthPath := IsHealthPath(state.Options.Path)
+	status, severity, summary := ClassifyHTTPStatus(state.OriginProbe.StatusCode, state.Options.Path, healthPath)
+	f.Status = status
+	f.Severity = severity
 	f.Summary = fmt.Sprintf(
-		"The origin returned HTTP %d in %s using Host: %s.",
+		"%s Origin returned HTTP %d in %s with Host: %s (TLS SNI: %s).",
+		summary,
 		state.OriginProbe.StatusCode,
 		state.OriginProbe.TotalDuration.Round(1),
 		state.OriginProbe.HostHeader,
+		state.Domain.Name,
 	)
 	f.Evidence = map[string]any{
-		"address":     state.OriginProbe.Address,
-		"status_code": state.OriginProbe.StatusCode,
+		"address":      state.OriginProbe.Address,
+		"status_code":  state.OriginProbe.StatusCode,
+		"host_header":  state.OriginProbe.HostHeader,
+		"tls_sni":      state.Domain.Name,
 	}
 	return []Finding{f}
 }
@@ -66,28 +73,41 @@ func (c *OriginCheck) hostHeaderFinding(state *State) []Finding {
 	if state.OriginProbe == nil || state.OriginHostProbe == nil {
 		return nil
 	}
-	if state.OriginHostProbe.Error != "" {
+	if state.OriginHostProbe.Error != "" || state.OriginProbe.Error != "" {
 		return nil
 	}
-	if state.OriginProbe.StatusCode >= 400 && state.OriginHostProbe.StatusCode >= 200 && state.OriginHostProbe.StatusCode < 400 {
+	healthPath := IsHealthPath(state.Options.Path)
+	customerStatus, customerSeverity, _ := ClassifyHTTPStatus(state.OriginProbe.StatusCode, state.Options.Path, healthPath)
+	defaultStatus, _, _ := ClassifyHTTPStatus(state.OriginHostProbe.StatusCode, state.Options.Path, healthPath)
+
+	// Compare Host header routing using HTTP status classification, same TLS SNI on both probes.
+	if customerStatus != defaultStatus {
 		return []Finding{{
 			ID:       "origin.host-header",
 			Category: string(CategoryOrigin),
-			Status:   StatusFail,
-			Severity: SeverityHigh,
+			Status:   StatusWarn,
+			Severity: SeverityMedium,
 			Title:    "Origin Host header routing",
 			Summary: fmt.Sprintf(
-				"The origin returns HTTP %d with Host: %s but HTTP %d without the customer Host header.",
-				state.OriginProbe.StatusCode,
-				state.OriginProbe.HostHeader,
-				state.OriginHostProbe.StatusCode,
+				"Origin responds differently with customer Host %q (HTTP %d, %s) vs default Host %q (HTTP %d, %s); TLS SNI remains %q on both probes.",
+				state.OriginProbe.HostHeader, state.OriginProbe.StatusCode, customerStatus,
+				state.OriginHostProbe.HostHeader, state.OriginHostProbe.StatusCode, defaultStatus,
+				state.Domain.Name,
 			),
-			Fix: &FixPlan{
-				ID:          "origin.host-header",
-				Description: "Configure origin virtual host for customer domain",
-				Safety:      FixSafetyExternal,
-				Automatic:   false,
+			Evidence: map[string]any{
+				"customer_host":  state.OriginProbe.HostHeader,
+				"default_host":   state.OriginHostProbe.HostHeader,
+				"customer_code":  state.OriginProbe.StatusCode,
+				"default_code":   state.OriginHostProbe.StatusCode,
+				"tls_sni":        state.Domain.Name,
 			},
+		}}
+	}
+	if customerStatus == StatusFail {
+		return []Finding{{
+			ID: "origin.host-header", Category: string(CategoryOrigin),
+			Status: StatusFail, Severity: customerSeverity, Title: "Origin Host header routing",
+			Summary: fmt.Sprintf("Origin returns HTTP %d with customer Host header.", state.OriginProbe.StatusCode),
 		}}
 	}
 	return []Finding{{
@@ -96,7 +116,7 @@ func (c *OriginCheck) hostHeaderFinding(state *State) []Finding {
 		Status:   StatusPass,
 		Severity: SeverityInfo,
 		Title:    "Origin Host header routing",
-		Summary:  "Origin responds consistently with the customer Host header.",
+		Summary:  "Origin responds consistently with the customer Host header (TLS SNI unchanged).",
 	}}
 }
 

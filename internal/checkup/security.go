@@ -148,7 +148,11 @@ func (c *SecurityCheck) securityHeadersFinding(state *State) []Finding {
 	if state.HTTPSProbe == nil {
 		return nil
 	}
-	headers := []string{
+	analysis := state.HTTPSProbe.AnalysisHeaders
+	if len(analysis) == 0 {
+		analysis = state.HTTPSProbe.Headers
+	}
+	names := []string{
 		"content-security-policy",
 		"x-content-type-options",
 		"referrer-policy",
@@ -156,8 +160,8 @@ func (c *SecurityCheck) securityHeadersFinding(state *State) []Finding {
 		"x-frame-options",
 	}
 	var missing []string
-	for _, h := range headers {
-		if _, ok := state.HTTPSProbe.Headers[h]; !ok {
+	for _, h := range names {
+		if _, ok := analysis[h]; !ok {
 			missing = append(missing, h)
 		}
 	}

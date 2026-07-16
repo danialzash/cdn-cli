@@ -18,21 +18,27 @@ func (c *CDNCheck) Run(_ context.Context, state *State) []Finding {
 	findings = append(findings, edge)
 
 	if state.HTTPSProbe != nil && len(state.HTTPSProbe.Headers) > 0 {
-		requestID := state.HTTPSProbe.Headers["x-request-id"]
-		if requestID == "" {
-			requestID = state.HTTPSProbe.Headers["x-verge-request-id"]
-		}
+		evidence := DetectEdgeEvidence(state.HTTPSProbe.AnalysisHeaders)
 		f := Finding{
 			ID:       "cdn.request-id",
 			Category: string(CategoryCDN),
 			Title:    "CDN request ID",
 			Severity: SeverityInfo,
-			Evidence: map[string]any{"headers": state.HTTPSProbe.Headers},
+			Evidence: map[string]any{"edge_evidence": evidence},
+		}
+		requestID := state.HTTPSProbe.Headers["x-verge-request-id"]
+		if requestID == "" {
+			requestID = state.HTTPSProbe.Headers["x-request-id"]
 		}
 		if requestID != "" {
-			f.Status = StatusPass
-			f.Summary = fmt.Sprintf("CDN request ID observed: %s", requestID)
 			f.Evidence["request_id"] = requestID
+			if evidence.Confidence == "strong" {
+				f.Status = StatusPass
+				f.Summary = fmt.Sprintf("VergeCloud request ID observed: %s", requestID)
+			} else {
+				f.Status = StatusWarn
+				f.Summary = "A generic request ID was observed but VergeCloud-specific edge evidence was not confirmed."
+			}
 		} else {
 			f.Status = StatusWarn
 			f.Summary = "No CDN request ID header was observed."
@@ -55,28 +61,35 @@ func (c *CDNCheck) edgeFinding(state *State) Finding {
 		f.Summary = "Edge detection skipped because HTTPS probe failed."
 		return f
 	}
-	f.Evidence = map[string]any{"headers": state.HTTPSProbe.Headers}
-	if IsVergeEdgeHeader(state.HTTPSProbe.Headers) {
-		f.Status = StatusPass
-		f.Summary = "The HTTPS response appears to be served through VergeCloud."
-		return f
+	evidence := DetectEdgeEvidence(state.HTTPSProbe.AnalysisHeaders)
+	f.Evidence = map[string]any{
+		"headers":       state.HTTPSProbe.Headers,
+		"edge_evidence": evidence,
 	}
 
-	cloudDNS := false
-	if state.Inspect != nil {
-		for _, record := range state.Inspect.DNS.Records {
-			if record.Cloud {
-				cloudDNS = true
-				break
+	switch evidence.Confidence {
+	case "strong":
+		f.Status = StatusPass
+		f.Summary = "The HTTPS response appears to be served through VergeCloud."
+	case "weak":
+		f.Status = StatusWarn
+		f.Summary = "Some CDN-like headers were observed but VergeCloud-specific edge evidence was not confirmed."
+	default:
+		cloudDNS := false
+		if state.Inspect != nil {
+			for _, record := range state.Inspect.DNS.Records {
+				if record.Cloud {
+					cloudDNS = true
+					break
+				}
 			}
 		}
-	}
-	if cloudDNS {
 		f.Status = StatusWarn
-		f.Summary = "Cloud-enabled DNS records exist but VergeCloud edge headers were not detected."
-	} else {
-		f.Status = StatusWarn
-		f.Summary = "VergeCloud edge headers were not detected on the HTTPS response."
+		if cloudDNS {
+			f.Summary = "Cloud-enabled DNS records exist but VergeCloud edge headers were not detected."
+		} else {
+			f.Summary = "VergeCloud edge headers were not detected on the HTTPS response."
+		}
 	}
 	return f
 }

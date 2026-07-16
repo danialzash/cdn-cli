@@ -9,65 +9,146 @@ import (
 	"github.com/vergecloud/cdn-cli/internal/dnsverify"
 )
 
-func (r *Runner) prepareState(ctx context.Context, state *State) {
-	enabled := state.Options.EnabledCategories()
+func (r *Runner) prepareState(ctx context.Context, state *State, req Requirements) {
 	domain := state.Domain.Name
 	path := state.Options.Path
 	timeout := state.Options.ProbeTimeout
+	resolver := NewPublicDNSResolver(state.Options.Resolvers, timeout)
 
-	if enabled[CategoryActivation] {
-		domainType := strings.ToLower(state.Domain.Type)
-		if domainType == "partial" || domainType == "cname" {
-			if check, err := r.source.CheckCnameSetup(ctx, domain); err == nil {
-				state.CnameCheck = check
-			}
-		} else if check, err := r.source.CheckNameservers(ctx, domain); err == nil {
-			state.NSCheck = check
-		}
+	if req.ActivationCNAME {
+		r.prepareCnameActivation(ctx, state, resolver, domain)
+	}
+	if req.ActivationNS {
+		r.prepareNSActivation(ctx, state, domain)
 	}
 
-	if enabled[CategorySmartCheck] {
-		if sc, err := r.source.GetLatestSmartCheck(ctx, domain); err == nil {
-			state.SmartCheck = sc
-		}
+	if req.SmartCheck {
+		r.prepareSmartCheck(ctx, state, domain)
 	}
 
-	checker := dnsverify.NewCheckerWithResolvers(timeout, state.Options.Resolvers)
-
-	needHTTP := enabled[CategoryHTTP] || enabled[CategoryCDN] || enabled[CategoryCache] || enabled[CategorySecurity] || enabled[CategoryDNS]
-	if needHTTP {
+	if req.PublicHTTP || req.PublicHTTPS || req.SecondHTTPS {
 		client := NewProbeHTTPClient(timeout)
-		state.HTTPProbe = ProbeHTTP(ctx, client, fmt.Sprintf("http://%s%s", domain, path), "")
-		state.HTTPSProbe = ProbeHTTP(ctx, client, fmt.Sprintf("https://%s%s", domain, path), "")
-		if enabled[CategoryCache] && state.HTTPSProbe != nil && state.HTTPSProbe.Error == "" {
+		if req.PublicHTTP {
+			state.HTTPProbe = ProbeHTTP(ctx, client, fmt.Sprintf("http://%s%s", domain, path), "")
+			recordHTTPProbeError(state, "http", state.HTTPProbe)
+		}
+		if req.PublicHTTPS || req.SecondHTTPS {
+			state.HTTPSProbe = ProbeHTTP(ctx, client, fmt.Sprintf("https://%s%s", domain, path), "")
+			recordHTTPProbeError(state, "https", state.HTTPSProbe)
+		}
+		if req.SecondHTTPS && state.HTTPSProbe != nil && state.HTTPSProbe.Error == "" {
 			state.SecondHTTPSProbe = ProbeHTTP(ctx, client, fmt.Sprintf("https://%s%s", domain, path), "")
 		}
 	}
 
-	if enabled[CategoryDNS] {
-		state.ApexResolution = hostResolves(ctx, checker.Resolver, domain)
-		state.WWWResolution = hostResolves(ctx, checker.Resolver, "www."+domain)
-		if state.Inspect != nil {
-			state.DNSResults = r.verifyDNSRecords(ctx, checker, domain, state)
+	if req.DNSApex || req.DNSWWW || req.DNSRecords {
+		r.prepareDNS(ctx, state, req, resolver, domain)
+	}
+
+	if req.TLS {
+		addr := net.JoinHostPort(domain, "443")
+		state.TLSProbe = ProbeTLS(ctx, addr, domain, timeout)
+		if state.TLSProbe != nil && state.TLSProbe.Error != "" && state.TLSProbe.ProbeExecError {
+			state.AddProbeError("tls", state.TLSProbe.Error)
 		}
 	}
 
-	if enabled[CategoryTLS] || enabled[CategorySecurity] {
-		addr := net.JoinHostPort(domain, "443")
-		state.TLSProbe = ProbeTLS(ctx, addr, domain, timeout)
-	}
-
-	if enabled[CategoryOrigin] && state.Options.Origin != "" {
+	if req.Origin && state.Options.Origin != "" {
 		r.runOriginProbes(ctx, state)
 	}
 }
 
-func hostResolves(ctx context.Context, resolver *net.Resolver, name string) bool {
-	if resolver == nil {
+func recordHTTPProbeError(state *State, name string, probe *HTTPProbeResult) {
+	if probe == nil {
+		state.AddProbeError(name, "probe did not run")
+		return
+	}
+	if probe.Error != "" && probe.ProbeExecError {
+		state.AddProbeError(name, probe.Error)
+	}
+}
+
+func (r *Runner) prepareCnameActivation(ctx context.Context, state *State, resolver *PublicDNSResolver, domain string) {
+	api, err := r.source.FetchCnameSetupStatus(ctx, domain)
+	if err != nil {
+		state.AddProbeError("activation.cname", err.Error())
+		return
+	}
+	expected := api.CnameTarget
+	if api.CustomCname != "" {
+		expected = api.CustomCname
+	}
+	resolved, resolveErr := resolver.LookupCNAME(ctx, domain)
+	resolveErrStr := ""
+	if resolveErr != nil {
+		resolveErrStr = resolveErr.Error()
+		state.AddProbeError("activation.cname.lookup", resolveErrStr)
+	}
+	state.CnameCheck = BuildCnameCheckResult(api.Status, expected, resolved, resolveErrStr)
+}
+
+func (r *Runner) prepareNSActivation(ctx context.Context, state *State, domain string) {
+	check, err := r.source.CheckNameservers(ctx, domain)
+	if err != nil {
+		state.AddProbeError("activation.nameservers", err.Error())
+		return
+	}
+	state.NSCheck = check
+}
+
+func (r *Runner) prepareSmartCheck(ctx context.Context, state *State, domain string) {
+	if state.Inspect != nil && state.Inspect.SmartCheck != nil {
+		state.SmartCheck = state.Inspect.SmartCheck
+		return
+	}
+	sc, err := r.source.GetLatestSmartCheck(ctx, domain)
+	if err != nil {
+		state.AddProbeError("smartcheck", err.Error())
+		return
+	}
+	state.SmartCheck = sc
+}
+
+func (r *Runner) prepareDNS(ctx context.Context, state *State, req Requirements, resolver *PublicDNSResolver, domain string) {
+	checker := dnsverify.NewCheckerWithResolvers(state.Options.ProbeTimeout, state.Options.Resolvers)
+	if req.DNSApex {
+		state.ApexResolution = resolver.HostResolves(ctx, domain)
+		if !state.ApexResolution {
+			// Resolution failure is a domain finding, not a probe execution error.
+		}
+	}
+	if req.DNSWWW {
+		state.WWWRequired = wwwRequired(state)
+		if state.WWWRequired {
+			state.WWWResolution = resolver.HostResolves(ctx, "www."+domain)
+		}
+	}
+	if req.DNSRecords && state.Inspect != nil {
+		state.DNSResults = r.verifyDNSRecords(ctx, checker, domain, state)
+	}
+}
+
+func wwwRequired(state *State) bool {
+	if state.Inspect == nil {
 		return false
 	}
-	_, err := resolver.LookupHost(ctx, name)
-	return err == nil
+	for _, record := range state.Inspect.DNS.Records {
+		name := strings.ToLower(strings.TrimSuffix(record.Name, "."))
+		if name == "www" || name == "www."+strings.ToLower(state.Domain.Name) {
+			return true
+		}
+	}
+	if state.SmartCheck != nil {
+		for _, item := range state.SmartCheck.Items {
+			if strings.Contains(strings.ToLower(item.ID+" "+item.Details), "www") {
+				return true
+			}
+		}
+	}
+	if state.Inspect.SSL.HTTPSRedirect {
+		return true
+	}
+	return false
 }
 
 func (r *Runner) verifyDNSRecords(ctx context.Context, checker *dnsverify.Checker, domain string, state *State) []dnsverify.Result {
@@ -99,14 +180,20 @@ func (r *Runner) verifyDNSRecords(ctx context.Context, checker *dnsverify.Checke
 }
 
 func cloudProxyStrongEvidence(state *State, result dnsverify.Result) bool {
-	if state.HTTPSProbe != nil && IsVergeEdgeHeader(state.HTTPSProbe.Headers) {
+	if state.HTTPSProbe != nil && IsVergeEdgeStrong(state.HTTPSProbe.AnalysisHeaders) {
 		return true
 	}
 	expected := strings.TrimSuffix(strings.ToLower(state.Domain.CnameTarget), ".")
 	if expected != "" && strings.Contains(strings.ToLower(result.Actual), expected) {
 		return true
 	}
-	return result.Status == "ok" && result.Actual != ""
+	if state.Domain.CustomCname != "" {
+		custom := strings.TrimSuffix(strings.ToLower(state.Domain.CustomCname), ".")
+		if custom != "" && strings.Contains(strings.ToLower(result.Actual), custom) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Runner) runOriginProbes(ctx context.Context, state *State) {
@@ -135,14 +222,21 @@ func (r *Runner) runOriginProbes(ctx context.Context, state *State) {
 			}
 		}
 	}
-	address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
+	dialAddress := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	path := opts.Path
-	domain := state.Domain.Name
-	url := fmt.Sprintf("%s://%s%s", scheme, address, path)
+	customerDomain := state.Domain.Name
+	requestURL := fmt.Sprintf("%s://%s%s", scheme, dialAddress, path)
 
-	client := NewProbeHTTPClient(opts.ProbeTimeout)
-	state.OriginProbe = mapOriginProbe(ProbeHTTP(ctx, client, url, domain), scheme, address, domain)
-	state.OriginHostProbe = mapOriginProbe(ProbeHTTP(ctx, client, url, ""), scheme, address, "")
+	tlsServerName := customerDomain
+	client := NewOriginProbeHTTPClient(opts.ProbeTimeout, dialAddress, tlsServerName)
+	state.OriginProbe = mapOriginProbe(ProbeHTTP(ctx, client, requestURL, customerDomain), scheme, dialAddress, customerDomain)
+
+	// Compare Host header only; TLS SNI stays on the customer domain.
+	defaultHost := host
+	if net.ParseIP(host) != nil {
+		defaultHost = dialAddress
+	}
+	state.OriginHostProbe = mapOriginProbe(ProbeHTTP(ctx, client, requestURL, defaultHost), scheme, dialAddress, defaultHost)
 }
 
 func mapOriginProbe(result *HTTPProbeResult, scheme, address, hostHeader string) *OriginProbeResult {

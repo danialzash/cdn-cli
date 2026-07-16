@@ -27,7 +27,7 @@ func (c *ConfigurationCheck) Run(_ context.Context, state *State) []Finding {
 
 	for _, errItem := range state.Inspect.Errors {
 		findings = append(findings, Finding{
-			ID:       fmt.Sprintf("configuration.%s-api", errItem.Section),
+			ID:       FindingID("configuration", errItem.Section, "api"),
 			Category: string(CategoryConfiguration),
 			Status:   StatusError,
 			Severity: SeverityMedium,
@@ -38,16 +38,48 @@ func (c *ConfigurationCheck) Run(_ context.Context, state *State) []Finding {
 		})
 	}
 
-	if state.Inspect.SSL.Enabled && state.Inspect.SSL.CertificateCount == 0 {
+	activeCount := 0
+	totalCount := len(state.Inspect.SSL.Certificates)
+	for _, cert := range state.Inspect.SSL.Certificates {
+		if cert.Active {
+			activeCount++
+		}
+	}
+
+	if state.Inspect.SSL.Enabled && activeCount == 0 {
 		findings = append(findings, Finding{
-			ID:       "configuration.ssl-no-cert",
+			ID:       "configuration.ssl-no-active-cert",
 			Category: string(CategoryConfiguration),
 			Status:   StatusFail,
 			Severity: SeverityHigh,
-			Title:    "SSL without certificate",
+			Title:    "SSL without active certificate",
 			Summary:  "SSL is enabled but no active certificate exists in VergeCloud configuration.",
+			Evidence: map[string]any{
+				"active_certificates": activeCount,
+				"total_certificates":  totalCount,
+			},
 			SuggestedCommands: []string{
 				fmt.Sprintf("verge ssl issue %s", state.Domain.Name),
+			},
+		})
+	} else if state.Inspect.SSL.Enabled && activeCount > 0 {
+		findings = append(findings, Finding{
+			ID: "configuration.ssl-active-cert", Category: string(CategoryConfiguration),
+			Status: StatusPass, Severity: SeverityInfo, Title: "SSL certificates",
+			Summary: fmt.Sprintf("%d active certificate(s) configured.", activeCount),
+			Evidence: map[string]any{
+				"active_certificates": activeCount,
+				"total_certificates":  totalCount,
+			},
+		})
+	} else if !state.Inspect.SSL.Enabled && activeCount > 0 {
+		findings = append(findings, Finding{
+			ID: "configuration.ssl-inactive-with-cert", Category: string(CategoryConfiguration),
+			Status: StatusPass, Severity: SeverityInfo, Title: "SSL certificates",
+			Summary: fmt.Sprintf("SSL is disabled; %d certificate(s) exist but are not in use.", totalCount),
+			Evidence: map[string]any{
+				"active_certificates": activeCount,
+				"total_certificates":  totalCount,
 			},
 		})
 	}
@@ -92,7 +124,7 @@ func (c *ConfigurationCheck) Run(_ context.Context, state *State) []Finding {
 	for seq, count := range seqSeen {
 		if count > 1 {
 			findings = append(findings, Finding{
-				ID:       "configuration.page-rules-duplicate-seq",
+				ID:       FindingID("configuration.page-rules-duplicate-seq", fmt.Sprintf("%d", seq)),
 				Category: string(CategoryConfiguration),
 				Status:   StatusWarn,
 				Severity: SeverityLow,

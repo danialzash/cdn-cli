@@ -61,8 +61,8 @@ func TestComputeExitCode(t *testing.T) {
 	if code := ComputeExitCode(summary, false, nil, false); code != ExitChecksFailed {
 		t.Fatalf("got %d", code)
 	}
-	if code := ComputeExitCode(summary, false, []ProbeError{{Probe: "dns"}}, false); code != ExitProbeError {
-		t.Fatalf("got %d", code)
+	if code := ComputeExitCode(Summary{Errors: 1}, false, nil, false); code != ExitProbeError {
+		t.Fatalf("errors should exit 3, got %d", code)
 	}
 }
 
@@ -111,12 +111,18 @@ func TestIsMailRelatedHostname(t *testing.T) {
 	}
 }
 
-func TestIsVergeEdgeHeader(t *testing.T) {
-	if !IsVergeEdgeHeader(map[string]string{"x-poweredby": "VergeCloud"}) {
-		t.Fatal("expected edge detection")
+func TestDetectEdgeEvidence(t *testing.T) {
+	if ev := DetectEdgeEvidence(map[string]string{"x-poweredby": "VergeCloud"}); ev.Confidence != "strong" || !ev.Detected {
+		t.Fatal("expected strong edge detection for powered-by")
 	}
-	if IsVergeEdgeHeader(map[string]string{"server": "nginx"}) {
-		t.Fatal("expected no edge detection")
+	if ev := DetectEdgeEvidence(map[string]string{"x-verge-request-id": "abc"}); ev.Confidence != "strong" {
+		t.Fatal("expected strong edge detection for verge request id")
+	}
+	if ev := DetectEdgeEvidence(map[string]string{"x-request-id": "abc"}); ev.Confidence != "weak" || ev.Detected {
+		t.Fatal("generic request id should be weak only")
+	}
+	if ev := DetectEdgeEvidence(map[string]string{"server": "nginx"}); ev.Confidence != "none" {
+		t.Fatal("expected no edge detection for nginx")
 	}
 }
 
@@ -145,8 +151,8 @@ func TestRegistryDependencies(t *testing.T) {
 	for i, c := range checks {
 		ids[i] = c.ID()
 	}
-	if ids[0] != "domain.resolve" {
-		t.Fatalf("expected domain.resolve first, got %v", ids)
+	if len(checks) != 1 || checks[0].ID() != "cdn" {
+		t.Fatalf("expected only cdn check, got %v", ids)
 	}
 }
 

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -77,50 +76,47 @@ origin tests. Read-only by default; pass --fix to review and apply safe fixes.`,
 			runner, err := checkup.NewRunner(source)
 			exitOnError(err)
 
-			withCheckupContext(opts.Timeout, func(ctx context.Context) error {
+			withCheckupContext(opts.Timeout, func(ctx context.Context) (int, error) {
 				result := runner.Run(ctx, domainArg, opts)
 				if result.Err != nil {
-					return result.Err
+					return checkup.ExitError, result.Err
 				}
 
+				applier := checkup.NewClientFixApplier(apiClient)
 				if opts.Fix {
 					plans := checkup.CollectFixPlans(result.Report.Findings)
 					if len(plans) > 0 {
 						if !jsonOutput {
 							printer().PrintCheckupFixPlans(plans)
 						}
-						if !opts.DryRun && !opts.Yes {
+						shouldApply := opts.DryRun || opts.Yes
+						if !shouldApply && !jsonOutput {
 							ok, err := printer().Confirm("Apply safe fixes?")
 							if err != nil {
-								return err
+								return checkup.ExitError, err
 							}
 							if !ok {
 								printer().PrintMessage("Fixes not applied.")
-							} else {
-								applier := checkup.NewClientFixApplier(apiClient)
-								runner.ApplyFixes(ctx, result.Report.Domain.Name, &result.Report, opts, applier)
 							}
-						} else {
-							applier := checkup.NewClientFixApplier(apiClient)
-							runner.ApplyFixes(ctx, result.Report.Domain.Name, &result.Report, opts, applier)
+							shouldApply = ok
+						}
+						if shouldApply {
+							runner.ApplyFixes(ctx, domainArg, &result.Report, opts, applier, applier)
 						}
 					}
 				}
 
 				if jsonOutput {
 					if err := printer().PrintJSON(result.Report); err != nil {
-						return err
+						return checkup.ExitError, err
 					}
 				} else {
 					if err := printer().PrintCheckupReport(result.Report); err != nil {
-						return err
+						return checkup.ExitError, err
 					}
 				}
 
-				if result.Report.ExitCode != checkup.ExitOK {
-					os.Exit(result.Report.ExitCode)
-				}
-				return nil
+				return result.Report.ExitCode, nil
 			})
 		},
 	}

@@ -52,7 +52,7 @@ func (c *SmartCheckCheck) Run(_ context.Context, state *State) []Finding {
 			severity = SeverityMedium
 		}
 		findings = append(findings, Finding{
-			ID:       fmt.Sprintf("smartcheck.%s", item.ID),
+			ID:       FindingID("smartcheck", item.ID),
 			Category: string(CategorySmartCheck),
 			Status:   status,
 			Severity: severity,

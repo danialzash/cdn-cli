@@ -6,11 +6,12 @@ import (
 )
 
 type FixRunner struct {
-	applier FixApplier
+	applier  FixApplier
+	verifier FixVerifier
 }
 
-func NewFixRunner(applier FixApplier) *FixRunner {
-	return &FixRunner{applier: applier}
+func NewFixRunner(applier FixApplier, verifier FixVerifier) *FixRunner {
+	return &FixRunner{applier: applier, verifier: verifier}
 }
 
 func CollectFixPlans(findings []Finding) []FixPlan {
@@ -45,8 +46,27 @@ func (fr *FixRunner) Apply(ctx context.Context, domain string, plans []FixPlan, 
 			continue
 		}
 		result.Applied = true
+		if fr.verifier == nil {
+			result.Error = "fix verification is not configured"
+			results = append(results, result)
+			continue
+		}
+		verified, message, err := fr.verifier.VerifyFix(ctx, domain, plan)
+		if err != nil {
+			result.Error = err.Error()
+			results = append(results, result)
+			continue
+		}
+		if !verified {
+			if message == "" {
+				message = "expected state was not confirmed after applying fix"
+			}
+			result.Error = message
+			results = append(results, result)
+			continue
+		}
 		result.Verified = true
-		result.Message = plan.Description + " applied successfully."
+		result.Message = plan.Description + " applied and verified."
 		results = append(results, result)
 	}
 	return results

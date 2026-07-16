@@ -21,6 +21,7 @@ func (c *DNSCheck) Run(_ context.Context, state *State) []Finding {
 		"dns.apex-resolution",
 		domain,
 		state.ApexResolution,
+		true,
 	)...)
 
 	wwwName := "www." + domain
@@ -28,6 +29,7 @@ func (c *DNSCheck) Run(_ context.Context, state *State) []Finding {
 		"dns.www-resolution",
 		wwwName,
 		state.WWWResolution,
+		state.WWWRequired,
 	)...)
 
 	for _, result := range state.DNSResults {
@@ -37,12 +39,18 @@ func (c *DNSCheck) Run(_ context.Context, state *State) []Finding {
 	return findings
 }
 
-func (c *DNSCheck) resolutionFinding(id, name string, resolved bool) []Finding {
+func (c *DNSCheck) resolutionFinding(id, name string, resolved, required bool) []Finding {
 	f := Finding{
 		ID:       id,
 		Category: string(CategoryDNS),
 		Title:    "DNS resolution",
-		Evidence: map[string]any{"hostname": name},
+		Evidence: map[string]any{"hostname": name, "required": required},
+	}
+	if !required {
+		f.Status = StatusSkip
+		f.Severity = SeverityInfo
+		f.Summary = "No www record is configured; the check was not required."
+		return []Finding{f}
 	}
 	if resolved {
 		f.Status = StatusPass
@@ -57,7 +65,7 @@ func (c *DNSCheck) resolutionFinding(id, name string, resolved bool) []Finding {
 }
 
 func (c *DNSCheck) recordFinding(domain string, result dnsverify.Result) []Finding {
-	id := fmt.Sprintf("dns.configured-records.%s", result.RecordID)
+	id := FindingID("dns.configured-records", result.RecordID)
 	if result.RecordID == "" {
 		id = "dns.configured-records"
 	}
@@ -78,7 +86,7 @@ func (c *DNSCheck) recordFinding(domain string, result dnsverify.Result) []Findi
 	switch result.Status {
 	case "ok":
 		if result.CloudWeak {
-			f.ID = "dns.cloud-proxy-weak"
+			f.ID = FindingID("dns.cloud-proxy-weak", result.RecordID)
 			f.Status = StatusWarn
 			f.Severity = SeverityMedium
 			f.Summary = fmt.Sprintf("%s resolves but cloud proxy correctness could not be strongly verified.", dnsverify.FQDN(result.Name, domain))
@@ -111,8 +119,9 @@ func (c *DNSCheck) recordFinding(domain string, result dnsverify.Result) []Findi
 	}
 
 	if result.MailCloudProxy {
+		mailID := FindingID("dns.mail-cloud-proxy", result.RecordID)
 		mail := Finding{
-			ID:       "dns.mail-cloud-proxy",
+			ID:       mailID,
 			Category: string(CategoryDNS),
 			Status:   StatusWarn,
 			Severity: SeverityMedium,
@@ -128,7 +137,7 @@ func (c *DNSCheck) recordFinding(domain string, result dnsverify.Result) []Findi
 		}
 		if result.RecordID != "" {
 			mail.Fix = &FixPlan{
-				ID:          fmt.Sprintf("dns.mail-cloud-proxy.%s", result.RecordID),
+				ID:          mailID,
 				Description: "Disable cloud proxy for mail-related hostname",
 				Safety:      FixSafetySafe,
 				Automatic:   true,

@@ -12,9 +12,9 @@ import (
 // DataSource loads domain and configuration data for checkup.
 type DataSource interface {
 	ResolveDomain(ctx context.Context, idOrName string) (*client.DomainDetail, error)
-	LoadInspect(ctx context.Context, domain string, categories map[Category]bool) (*client.DomainInspect, error)
+	LoadInspect(ctx context.Context, domain string, sections map[string]bool) (*client.DomainInspect, error)
 	CheckNameservers(ctx context.Context, domain string) (*client.NSCheckResult, error)
-	CheckCnameSetup(ctx context.Context, domain string) (*client.CnameCheckResult, error)
+	FetchCnameSetupStatus(ctx context.Context, domain string) (*client.CnameSetupStatus, error)
 	GetLatestSmartCheck(ctx context.Context, domain string) (*client.SmartCheck, error)
 }
 
@@ -23,13 +23,20 @@ type FixApplier interface {
 	ApplyFix(ctx context.Context, domain string, plan FixPlan) error
 }
 
+// FixVerifier confirms a fix reached the desired state.
+type FixVerifier interface {
+	VerifyFix(ctx context.Context, domain string, plan FixPlan) (verified bool, message string, err error)
+}
+
 type State struct {
-	Options Options
-	Domain  DomainSummary
+	Options           Options
+	Domain            DomainSummary
+	VisibleCategories map[Category]bool
+	Requirements      Requirements
 
 	Inspect    *client.DomainInspect
 	NSCheck    *client.NSCheckResult
-	CnameCheck *client.CnameCheckResult
+	CnameCheck *CnameCheckResult
 	SmartCheck *client.SmartCheck
 
 	DNSResults []dnsverify.Result
@@ -45,6 +52,7 @@ type State struct {
 
 	ApexResolution bool
 	WWWResolution  bool
+	WWWRequired    bool
 
 	mu sync.RWMutex
 }
@@ -61,6 +69,8 @@ type HTTPProbeResult struct {
 	StatusCode       int
 	RedirectChain    []string
 	Headers          map[string]string
+	AnalysisHeaders  map[string]string
+	RedirectEvidence RedirectEvidence
 	TimedOut         bool
 	RedirectLoop     bool
 	TooManyRedirects bool
@@ -71,6 +81,18 @@ type HTTPProbeResult struct {
 	TotalDuration    time.Duration
 	BodySampleHash   string
 	Error            string
+	ProbeExecError   bool
+}
+
+type RedirectEvidence struct {
+	InitialURL        string
+	RedirectChain     []string
+	FinalURL          string
+	FinalStatus       int
+	UnexpectedHosts   []string
+	DowngradeDetected bool
+	LoopDetected      bool
+	TooManyRedirects  bool
 }
 
 type TLSProbeResult struct {
@@ -87,6 +109,7 @@ type TLSProbeResult struct {
 	ALPN              string
 	Error             string
 	DiagnosticNote    string
+	ProbeExecError    bool
 }
 
 type OriginProbeResult struct {

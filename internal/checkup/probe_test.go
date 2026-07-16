@@ -36,8 +36,12 @@ func TestProbeHTTPVergeHeaders(t *testing.T) {
 	if result.Error != "" {
 		t.Fatal(result.Error)
 	}
-	if !IsVergeEdgeHeader(result.Headers) {
-		t.Fatalf("expected edge headers, got %#v", result.Headers)
+	if !IsVergeEdgeStrong(result.AnalysisHeaders) {
+		t.Fatalf("expected strong edge evidence, got %#v", result.AnalysisHeaders)
+	}
+	ev := DetectEdgeEvidence(result.AnalysisHeaders)
+	if ev.Confidence != "strong" {
+		t.Fatalf("expected strong confidence, got %q", ev.Confidence)
 	}
 }
 
@@ -93,6 +97,24 @@ func TestProbeHTTPIndependentRedirectState(t *testing.T) {
 	}
 	if okResult.RedirectLoop {
 		t.Fatal("first probe redirect state was contaminated by second probe")
+	}
+}
+
+func TestFilterAnalysisHeadersIncludesSecurityHeaders(t *testing.T) {
+	h := http.Header{}
+	h.Set("Set-Cookie", "secret=1")
+	h.Set("Content-Security-Policy", "default-src 'self'")
+	h.Set("Server", "nginx")
+	analysis := FilterAnalysisHeaders(h)
+	safe := FilterSafeHeaders(h)
+	if _, ok := analysis["content-security-policy"]; !ok {
+		t.Fatal("analysis must include CSP")
+	}
+	if _, ok := safe["content-security-policy"]; ok {
+		t.Fatal("safe output must not include CSP")
+	}
+	if _, ok := safe["set-cookie"]; ok {
+		t.Fatal("safe output must not include cookies")
 	}
 }
 

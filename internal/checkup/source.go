@@ -2,6 +2,7 @@ package checkup
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/vergecloud/cdn-cli/internal/client"
@@ -19,13 +20,7 @@ func (s *ClientSource) ResolveDomain(ctx context.Context, idOrName string) (*cli
 	return s.Client.GetDomainDetail(ctx, idOrName)
 }
 
-func (s *ClientSource) LoadInspect(ctx context.Context, domain string, categories map[Category]bool) (*client.DomainInspect, error) {
-	sections := make(map[string]bool, len(categories))
-	for c, enabled := range categories {
-		if enabled {
-			sections[string(c)] = true
-		}
-	}
+func (s *ClientSource) LoadInspect(ctx context.Context, domain string, sections map[string]bool) (*client.DomainInspect, error) {
 	return s.Client.LoadCheckupInspect(ctx, domain, sections)
 }
 
@@ -33,8 +28,8 @@ func (s *ClientSource) CheckNameservers(ctx context.Context, domain string) (*cl
 	return s.Client.CheckNameservers(ctx, domain)
 }
 
-func (s *ClientSource) CheckCnameSetup(ctx context.Context, domain string) (*client.CnameCheckResult, error) {
-	return s.Client.CheckCnameSetup(ctx, domain)
+func (s *ClientSource) FetchCnameSetupStatus(ctx context.Context, domain string) (*client.CnameSetupStatus, error) {
+	return s.Client.FetchCnameSetupStatus(ctx, domain)
 }
 
 func (s *ClientSource) GetLatestSmartCheck(ctx context.Context, domain string) (*client.SmartCheck, error) {
@@ -59,6 +54,41 @@ func (a *ClientFixApplier) ApplyFix(ctx context.Context, domain string, plan Fix
 	case plan.ID == "ssl.https-redirect":
 		return a.Client.EnableHTTPSRedirect(ctx, domain)
 	default:
-		return nil
+		return fmt.Errorf("unsupported automatic fix %q", plan.ID)
+	}
+}
+
+func (a *ClientFixApplier) VerifyFix(ctx context.Context, domain string, plan FixPlan) (bool, string, error) {
+	switch {
+	case plan.ID == "cache.developer-mode":
+		settings, err := a.Client.GetCacheSettings(ctx, domain)
+		if err != nil {
+			return false, "", err
+		}
+		if settings.DeveloperMode {
+			return false, "cache developer mode is still enabled", nil
+		}
+		return true, "", nil
+	case strings.HasPrefix(plan.ID, "dns.mail-cloud-proxy."):
+		recordID := strings.TrimPrefix(plan.ID, "dns.mail-cloud-proxy.")
+		record, err := a.Client.GetDNSRecord(ctx, domain, recordID)
+		if err != nil {
+			return false, "", err
+		}
+		if record.Cloud {
+			return false, "DNS record cloud proxy is still enabled", nil
+		}
+		return true, "", nil
+	case plan.ID == "ssl.https-redirect":
+		settings, err := a.Client.GetSslSettings(ctx, domain)
+		if err != nil {
+			return false, "", err
+		}
+		if !settings.HTTPSRedirect {
+			return false, "HTTPS redirect is still disabled", nil
+		}
+		return true, "", nil
+	default:
+		return false, "", fmt.Errorf("unsupported automatic fix %q", plan.ID)
 	}
 }

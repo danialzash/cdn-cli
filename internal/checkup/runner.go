@@ -39,31 +39,38 @@ func (r *Runner) Run(ctx context.Context, domainArg string, opts Options) Result
 	state := &State{Options: opts}
 
 	enabled := opts.EnabledCategories()
-	checks, err := r.registry.ChecksForCategories(enabled)
+	plan, err := r.registry.Plan(enabled)
 	if err != nil {
 		return Result{Err: err, ExitCode: ExitError}
 	}
+	state.VisibleCategories = plan.VisibleCategories
+	state.Requirements = plan.Requirements
 
-	var findings []Finding
-	if err := r.runDomainResolve(ctx, domainArg, state); err != nil {
+	if err := r.runDomainResolve(ctx, domainArg, state, plan.Requirements); err != nil {
 		return Result{Err: err, ExitCode: ExitError}
 	}
-	r.prepareState(ctx, state)
+	r.prepareState(ctx, state, plan.Requirements)
 
-	for _, check := range checks {
+	var findings []Finding
+	for _, check := range plan.VisibleChecks {
 		if ctx.Err() != nil {
 			break
-		}
-		if check.ID() == "domain.resolve" {
-			continue
 		}
 		findings = append(findings, check.Run(ctx, state)...)
 	}
 
+	report := r.buildReport(state, opts, findings, started, false)
+	return Result{
+		Report:   report,
+		ExitCode: report.ExitCode,
+	}
+}
+
+func (r *Runner) buildReport(state *State, opts Options, findings []Finding, started time.Time, fixFailed bool) Report {
 	SortFindings(findings)
+	ensureUniqueFindingIDs(findings)
 	summary := SummarizeFindings(findings)
 	completed := time.Now()
-
 	report := Report{
 		Domain:      state.Domain,
 		Options:     opts,
@@ -74,28 +81,39 @@ func (r *Runner) Run(ctx context.Context, domainArg string, opts Options) Result
 		Summary:     summary,
 		ProbeErrors: append([]ProbeError(nil), state.ProbeErrors...),
 	}
-	report.ExitCode = ComputeExitCode(summary, opts.Strict, report.ProbeErrors, false)
+	report.ExitCode = ComputeExitCode(summary, opts.Strict, report.ProbeErrors, fixFailed)
+	return report
+}
 
-	return Result{
-		Report:   report,
-		ExitCode: report.ExitCode,
+func ensureUniqueFindingIDs(findings []Finding) {
+	seen := map[string]int{}
+	for i := range findings {
+		id := findings[i].ID
+		if count, ok := seen[id]; ok {
+			seen[id] = count + 1
+			findings[i].ID = FindingID(id, fmt.Sprintf("%d", count+1))
+		} else {
+			seen[id] = 1
+		}
 	}
 }
 
-func (r *Runner) runDomainResolve(ctx context.Context, domainArg string, state *State) error {
+func (r *Runner) runDomainResolve(ctx context.Context, domainArg string, state *State, req Requirements) error {
 	detail, err := r.source.ResolveDomain(ctx, domainArg)
 	if err != nil {
 		return fmt.Errorf("resolve domain: %w", err)
 	}
 	state.Domain = mapDomainSummary(*detail)
-	state.Inspect, err = r.source.LoadInspect(ctx, detail.Name, state.Options.EnabledCategories())
+	sections := inspectSectionsFromRequirements(req)
+	state.Inspect, err = r.source.LoadInspect(ctx, detail.Name, sections)
 	if err != nil {
 		return fmt.Errorf("load inspect data: %w", err)
 	}
 	return nil
 }
 
-func (r *Runner) ApplyFixes(ctx context.Context, domain string, report *Report, opts Options, applier FixApplier) {
+// ApplyFixes applies safe fixes, verifies each change, and reruns checkup read-only when not dry-run.
+func (r *Runner) ApplyFixes(ctx context.Context, domainArg string, report *Report, opts Options, applier FixApplier, verifier FixVerifier) {
 	if !opts.Fix || applier == nil {
 		return
 	}
@@ -103,11 +121,47 @@ func (r *Runner) ApplyFixes(ctx context.Context, domain string, report *Report, 
 	if len(plans) == 0 {
 		return
 	}
-	fixRunner := NewFixRunner(applier)
-	report.Fixes = fixRunner.Apply(ctx, domain, plans, opts.DryRun)
-	if FixFailed(report.Fixes) {
-		report.ExitCode = ExitFixFailed
+	fixRunner := NewFixRunner(applier, verifier)
+	report.Fixes = fixRunner.Apply(ctx, report.Domain.Name, plans, opts.DryRun)
+	fixFailed := FixFailed(report.Fixes) || fixVerificationFailed(report.Fixes)
+
+	if opts.DryRun || !anyFixApplied(report.Fixes) {
+		if fixFailed {
+			report.ExitCode = ExitFixFailed
+		}
+		return
 	}
+
+	rerun := r.Run(ctx, domainArg, opts)
+	if rerun.Err != nil {
+		report.ExitCode = ExitError
+		return
+	}
+	rerun.Report.Fixes = report.Fixes
+	*report = rerun.Report
+	if fixFailed {
+		report.ExitCode = ExitFixFailed
+	} else {
+		report.ExitCode = ComputeExitCode(report.Summary, opts.Strict, report.ProbeErrors, false)
+	}
+}
+
+func anyFixApplied(results []FixResult) bool {
+	for _, r := range results {
+		if r.Applied {
+			return true
+		}
+	}
+	return false
+}
+
+func fixVerificationFailed(results []FixResult) bool {
+	for _, r := range results {
+		if r.Applied && !r.Verified {
+			return true
+		}
+	}
+	return false
 }
 
 func mapDomainSummary(d client.DomainDetail) DomainSummary {

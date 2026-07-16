@@ -128,46 +128,80 @@ func (c *ActivationCheck) checkCNAME(state *State) []Finding {
 	if state.Domain.CustomCname != "" {
 		expected = state.Domain.CustomCname
 	}
-	finding.Evidence = map[string]any{
-		"expected_target": expected,
+	finding.Evidence = map[string]any{"expected_target": expected}
+
+	if state.CnameCheck == nil {
+		finding.Status = StatusError
+		finding.Summary = "Live CNAME activation check could not be loaded."
+		return []Finding{finding}
 	}
 
-	if state.CnameCheck != nil {
-		finding.Evidence["resolved_target"] = state.CnameCheck.ResolvedTarget
-		finding.Evidence["matches"] = state.CnameCheck.Matches
-		if state.CnameCheck.ResolveError != "" {
-			finding.Evidence["resolve_error"] = state.CnameCheck.ResolveError
-		}
-		if state.CnameCheck.Matches {
-			finding.Status = StatusPass
-			finding.Summary = "Public CNAME target matches the expected VergeCloud target."
-			return []Finding{finding}
-		}
+	check := state.CnameCheck
+	finding.Evidence["api_status"] = check.APIStatus
+	finding.Evidence["resolved_target"] = check.ResolvedTarget
+	finding.Evidence["live_matches"] = check.LiveMatches
+	if check.ResolveError != "" {
+		finding.Evidence["resolve_error"] = check.ResolveError
+	}
+
+	apiActive := strings.EqualFold(check.APIStatus, "active")
+	apiPending := strings.EqualFold(check.APIStatus, "pending")
+
+	switch {
+	case check.LiveMatches && apiActive:
+		finding.Status = StatusPass
+		finding.Summary = "Public CNAME target matches the expected VergeCloud target."
+		return []Finding{finding}
+	case check.LiveMatches && apiPending:
+		finding.Status = StatusWarn
+		finding.Severity = SeverityMedium
+		finding.Summary = "Public CNAME matches but VergeCloud activation is still pending."
+		finding.Details = "DNS may be correct while activation has not fully propagated in VergeCloud."
+		return []Finding{finding}
+	case check.LiveMatches:
+		finding.Status = StatusPass
+		finding.Summary = "Public CNAME target matches the expected VergeCloud target."
+		return []Finding{finding}
+	case check.ResolveError != "":
+		finding.Status = StatusError
+		finding.Summary = "Live CNAME lookup failed."
+		finding.Details = check.ResolveError
+		return []Finding{finding}
+	case apiActive && !check.LiveMatches:
 		finding.Status = StatusFail
-		resolved := state.CnameCheck.ResolvedTarget
+		resolved := check.ResolvedTarget
+		if resolved == "" {
+			resolved = "(not resolved)"
+		}
+		finding.Summary = fmt.Sprintf(
+			"VergeCloud reports active but public CNAME resolves to %s, expected %q.",
+			resolved, expected,
+		)
+		finding.Details = "Publish the correct CNAME at your DNS provider. Registrar changes are external."
+		finding.Fix = &FixPlan{
+			ID:          "activation.cname-target",
+			Description: "Update DNS provider CNAME to VergeCloud target",
+			Safety:      FixSafetyExternal,
+			Automatic:   false,
+		}
+		return []Finding{finding}
+	default:
+		finding.Status = StatusFail
+		resolved := check.ResolvedTarget
 		if resolved == "" {
 			resolved = "(not resolved)"
 		}
 		finding.Summary = fmt.Sprintf(
 			"Public CNAME resolves to %s but VergeCloud expects %q.",
-			resolved,
-			expected,
+			resolved, expected,
 		)
-	} else if expected != "" {
-		finding.Status = StatusWarn
-		finding.Summary = "Expected CNAME target is configured but live CNAME check data is unavailable."
-		finding.Evidence["expected_target"] = expected
-	} else {
-		finding.Status = StatusWarn
-		finding.Summary = "No expected CNAME target is configured."
+		finding.Details = "Publish the correct CNAME at your DNS provider. Registrar changes are external."
+		finding.Fix = &FixPlan{
+			ID:          "activation.cname-target",
+			Description: "Update DNS provider CNAME to VergeCloud target",
+			Safety:      FixSafetyExternal,
+			Automatic:   false,
+		}
+		return []Finding{finding}
 	}
-
-	finding.Details = "Publish the correct CNAME at your DNS provider. Registrar changes are external."
-	finding.Fix = &FixPlan{
-		ID:          "activation.cname-target",
-		Description: "Update DNS provider CNAME to VergeCloud target",
-		Safety:      FixSafetyExternal,
-		Automatic:   false,
-	}
-	return []Finding{finding}
 }
