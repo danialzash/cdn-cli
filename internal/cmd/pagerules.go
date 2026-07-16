@@ -19,6 +19,7 @@ func newPageRulesCmd() *cobra.Command {
 	cmd.AddCommand(
 		newPageRulesListCmd(),
 		newPageRulesGetCmd(),
+		newPageRulesAddCmd(),
 		newPageRulesUpdateCmd(),
 		newPageRulesDeleteCmd(),
 	)
@@ -87,6 +88,72 @@ func newPageRulesGetCmd() *cobra.Command {
 			})
 		},
 	}
+}
+
+func newPageRulesAddCmd() *cobra.Command {
+	var (
+		url         string
+		enabled     bool
+		seq         int
+		cacheLevel  string
+		cacheMaxAge string
+	)
+
+	cmd := &cobra.Command{
+		Use:     "add <domain>",
+		Aliases: []string{"create"},
+		Short:   "Create a page rule",
+		Long: `Create a page rule for a domain.
+
+Examples:
+  verge page-rules add example.com --url "/api/*"
+  verge page-rules add example.com --url "/static/*" --cache-level uri --cache-max-age 1h
+  verge page-rules add example.com --url "/admin" --enabled=false`,
+		Args: cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			if url == "" {
+				exitOnError(fmt.Errorf("--url is required"))
+			}
+
+			cfg, err := loadRuntimeConfig()
+			exitOnError(err)
+
+			c, err := newAPIClient(cfg)
+			exitOnError(err)
+
+			domain := args[0]
+
+			withContext(func(ctx context.Context) error {
+				rule, err := c.CreatePageRule(ctx, domain, client.CreatePageRuleInput{
+					URL:         url,
+					Enabled:     enabled,
+					Seq:         seq,
+					CacheLevel:  strings.ToLower(cacheLevel),
+					CacheMaxAge: cacheMaxAge,
+				})
+				if err != nil {
+					return fmt.Errorf("create page rule: %w", err)
+				}
+				if jsonOutput {
+					if len(rule.Raw) > 0 {
+						return printer().PrintRawJSON(rule.Raw)
+					}
+					return printer().PrintJSON(rule)
+				}
+				printer().PrintMessage("Page rule created successfully.")
+				return printer().PrintPageRule(rule)
+			})
+		},
+	}
+
+	cmd.Flags().StringVar(&url, "url", "", "URL pattern")
+	cmd.Flags().BoolVar(&enabled, "enabled", true, "Whether the page rule is enabled")
+	cmd.Flags().IntVar(&seq, "seq", 0, "Rule sequence/order")
+	cmd.Flags().StringVar(&cacheLevel, "cache-level", "", "Cache level: off, uri, query_string")
+	cmd.Flags().StringVar(&cacheMaxAge, "cache-max-age", "", "Cache max age (e.g. 30m, 1h)")
+	_ = cmd.MarkFlagRequired("url")
+
+	return cmd
 }
 
 func newPageRulesUpdateCmd() *cobra.Command {

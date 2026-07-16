@@ -16,6 +16,7 @@ func newFirewallCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newFirewallListCmd(),
+		newFirewallAddCmd(),
 		newFirewallUpdateCmd(),
 		newFirewallDeleteCmd(),
 	)
@@ -52,6 +53,73 @@ func newFirewallListCmd() *cobra.Command {
 			})
 		},
 	}
+}
+
+func newFirewallAddCmd() *cobra.Command {
+	var (
+		name       string
+		filterExpr string
+		action     string
+		priority   int
+		enabled    bool
+		note       string
+	)
+
+	cmd := &cobra.Command{
+		Use:     "add <domain>",
+		Aliases: []string{"create"},
+		Short:   "Create a firewall rule",
+		Long: `Create a firewall rule for a domain.
+
+Examples:
+  verge firewall add example.com --name "Block IR" --filter 'ip.geoip.country in {"IR"}' --action deny
+  verge firewall add example.com --name "Allow office" --filter 'ip.src == 198.51.100.0/24' --action allow --priority 10`,
+		Args: cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			if name == "" || filterExpr == "" || action == "" {
+				exitOnError(fmt.Errorf("--name, --filter, and --action are required"))
+			}
+
+			cfg, err := loadRuntimeConfig()
+			exitOnError(err)
+
+			c, err := newAPIClient(cfg)
+			exitOnError(err)
+
+			domain := args[0]
+
+			withContext(func(ctx context.Context) error {
+				rule, err := c.CreateFirewallRule(ctx, domain, client.CreateFirewallRuleInput{
+					Name:       name,
+					FilterExpr: filterExpr,
+					Action:     strings.ToLower(action),
+					Priority:   priority,
+					Enabled:    enabled,
+					Note:       note,
+				})
+				if err != nil {
+					return fmt.Errorf("create firewall rule: %w", err)
+				}
+				if jsonOutput {
+					return printer().PrintJSON(rule)
+				}
+				printer().PrintMessage("Firewall rule created successfully.")
+				return printer().PrintFirewallRule(rule)
+			})
+		},
+	}
+
+	cmd.Flags().StringVar(&name, "name", "", "Rule name")
+	cmd.Flags().StringVar(&filterExpr, "filter", "", "Wireshark-like filter expression")
+	cmd.Flags().StringVar(&action, "action", "", "Action: allow, deny, bypass, challenge")
+	cmd.Flags().IntVar(&priority, "priority", 0, "Rule priority")
+	cmd.Flags().BoolVar(&enabled, "enabled", true, "Whether the rule is enabled")
+	cmd.Flags().StringVar(&note, "note", "", "Optional note")
+	_ = cmd.MarkFlagRequired("name")
+	_ = cmd.MarkFlagRequired("filter")
+	_ = cmd.MarkFlagRequired("action")
+
+	return cmd
 }
 
 func newFirewallUpdateCmd() *cobra.Command {

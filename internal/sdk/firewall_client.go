@@ -6,6 +6,15 @@ import (
 	"net/url"
 )
 
+func (c *Client) CreateFirewallRule(ctx context.Context, domain string, req CreateFirewallRuleRequest) (*FirewallRule, error) {
+	var resp FirewallRuleResponse
+	path := "/firewall/" + url.PathEscape(domain) + "/rules"
+	if err := c.request(ctx, http.MethodPost, path, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp.Data, nil
+}
+
 func (c *Client) GetFirewallRule(ctx context.Context, domain, id string) (*FirewallRule, error) {
 	var resp FirewallRuleResponse
 	path := "/firewall/" + url.PathEscape(domain) + "/rules/" + url.PathEscape(id)

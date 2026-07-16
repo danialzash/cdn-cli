@@ -107,6 +107,15 @@ type UpdateFirewallRuleRequest struct {
 	Note       *string `json:"note,omitempty"`
 }
 
+type CreateFirewallRuleRequest struct {
+	Name       string `json:"name"`
+	FilterExpr string `json:"filter_expr"`
+	Action     string `json:"action"`
+	Priority   int    `json:"priority,omitempty"`
+	IsEnabled  bool   `json:"is_enabled,omitempty"`
+	Note       string `json:"note,omitempty"`
+}
+
 type WafPackage struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`

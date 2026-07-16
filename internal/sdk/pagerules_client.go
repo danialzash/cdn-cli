@@ -8,6 +8,15 @@ import (
 	"strconv"
 )
 
+func (c *Client) CreatePageRule(ctx context.Context, domain string, body json.RawMessage) (json.RawMessage, error) {
+	var resp PageRuleResponse
+	path := "/page-rules/" + url.PathEscape(domain)
+	if err := c.request(ctx, http.MethodPost, path, body, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Data, nil
+}
+
 func (c *Client) ListPageRules(ctx context.Context, domain string, page, perPage int) (*PageRulesResponse, error) {
 	query := paginateQuery(page, perPage)
 	var resp PageRulesResponse
@@ -74,6 +83,25 @@ func MergePageRuleUpdate(existing json.RawMessage, patch map[string]any) (json.R
 		current[key] = value
 	}
 	return json.Marshal(current)
+}
+
+func BuildCreatePageRuleBody(url string, enabled bool, seq int, cacheLevel, cacheMaxAge string) (json.RawMessage, error) {
+	body := map[string]any{
+		"url":    url,
+		"status": enabled,
+	}
+	if cacheLevel != "" {
+		body["cache_level"] = cacheLevel
+	} else {
+		body["cache_level"] = "query_string"
+	}
+	if seq > 0 {
+		body["seq"] = seq
+	}
+	if cacheMaxAge != "" {
+		body["cache_max_age"] = cacheMaxAge
+	}
+	return json.Marshal(body)
 }
 
 func paginateQuery(page, perPage int) url.Values {

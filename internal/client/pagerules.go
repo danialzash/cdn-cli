@@ -26,6 +26,27 @@ type UpdatePageRuleInput struct {
 	CacheMaxAge *string
 }
 
+type CreatePageRuleInput struct {
+	URL         string
+	Enabled     bool
+	Seq         int
+	CacheLevel  string
+	CacheMaxAge string
+}
+
+func (c *Client) CreatePageRule(ctx context.Context, domain string, input CreatePageRuleInput) (*PageRule, error) {
+	body, err := sdk.BuildCreatePageRuleBody(input.URL, input.Enabled, input.Seq, input.CacheLevel, input.CacheMaxAge)
+	if err != nil {
+		return nil, err
+	}
+
+	created, err := c.sdk.CreatePageRule(ctx, domain, body)
+	if err != nil {
+		return nil, err
+	}
+	return mapPageRuleRaw(created)
+}
+
 func (c *Client) ListPageRules(ctx context.Context, domain string) ([]PageRule, error) {
 	var all []PageRule
 	page := 1

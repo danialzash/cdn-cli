@@ -275,6 +275,7 @@ verge waf packages --domain example.com
 
 ```bash
 verge firewall list example.com
+verge firewall add example.com --name "Block country" --filter 'ip.geoip.country in {"IR"}' --action deny
 verge firewall update example.com <rule-id> --name "Block country" --filter 'ip.geoip.country in {"IR"}' --action deny
 verge firewall update example.com <rule-id> --enabled=false
 verge firewall delete example.com <rule-id>
@@ -285,6 +286,7 @@ verge firewall delete example.com <rule-id> --force
 
 ```bash
 verge page-rules list example.com
+verge page-rules add example.com --url "/api/*" --cache-level uri --cache-max-age 1h
 verge page-rules get example.com <rule-id>
 verge page-rules update example.com <rule-id> --url "/api/*" --cache-level uri --cache-max-age 1h
 verge page-rules update example.com <rule-id> --enabled=false
@@ -390,10 +392,12 @@ verge domains inspect <domain>
 verge waf packages [--domain <domain>]
 
 verge firewall list <domain>
+verge firewall add <domain> --name <name> --filter <expr> --action <action> [--priority <n>] [--enabled] [--note <text>]
 verge firewall update <domain> <rule-id> [--name <name>] [--filter <expr>] [--action <action>] [--priority <n>] [--enabled] [--note <text>]
 verge firewall delete <domain> <rule-id> [--force]
 
 verge page-rules list <domain>
+verge page-rules add <domain> --url <pattern> [--cache-level <level>] [--cache-max-age <duration>] [--enabled] [--seq <n>]
 verge page-rules get <domain> <rule-id>
 verge page-rules update <domain> <rule-id> [--url <pattern>] [--enabled] [--seq <n>] [--cache-level <level>] [--cache-max-age <duration>]
 verge page-rules delete <domain> <rule-id> [--force]
