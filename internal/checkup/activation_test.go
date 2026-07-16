@@ -17,6 +17,7 @@ func TestActivationCNAMEUsesResolvedTarget(t *testing.T) {
 			ResolvedTarget: "wrong.example.com",
 			ExpectedTarget: "edge.example.cdn.net",
 			LiveMatches:    false,
+			Classification: DNSLookupFound,
 			APIStatus:      "pending",
 		},
 	})
@@ -39,7 +40,8 @@ func TestActivationCNAMEAPIActiveLiveMismatchFails(t *testing.T) {
 	findings := check.checkCNAME(&State{
 		Domain: DomainSummary{Name: "app.example.com", Type: "partial", CnameTarget: "edge.example.cdn.net"},
 		CnameCheck: &CnameCheckResult{
-			APIStatus: "active", ResolvedTarget: "wrong.example.com", ExpectedTarget: "edge.example.cdn.net", LiveMatches: false,
+			APIStatus: "active", ResolvedTarget: "wrong.example.com", ExpectedTarget: "edge.example.cdn.net",
+			LiveMatches: false, Classification: DNSLookupFound,
 		},
 	})
 	if findings[0].Status != StatusFail {
@@ -52,7 +54,7 @@ func TestActivationCNAMEPendingLiveMatchWarns(t *testing.T) {
 	findings := check.checkCNAME(&State{
 		Domain: DomainSummary{Name: "app.example.com", Type: "partial", CnameTarget: "edge.example.cdn.net"},
 		CnameCheck: &CnameCheckResult{
-			APIStatus: "pending", ResolvedTarget: "edge.example.cdn.net", LiveMatches: true,
+			APIStatus: "pending", ResolvedTarget: "edge.example.cdn.net", LiveMatches: true, Classification: DNSLookupFound,
 		},
 	})
 	if findings[0].Status != StatusWarn {

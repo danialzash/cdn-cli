@@ -127,7 +127,10 @@ func TestSSLAPIFailureBlocksRedirectConfigComparison(t *testing.T) {
 		HTTPSProbe: &HTTPProbeResult{StatusCode: 200},
 		TLSProbe:   &TLSProbeResult{Connected: true, HostnameMatch: true},
 	})
-	if findings[0].Status == StatusPass && findings[0].Fix != nil {
-		t.Fatalf("should not auto-fix based on unavailable SSL API: %+v", findings[0])
+	if len(findings) != 1 || findings[0].ID != "http.ssl-api" {
+		t.Fatalf("got %+v", findings)
+	}
+	if findings[0].Fix != nil {
+		t.Fatal("must not offer automatic fix when SSL API is unavailable")
 	}
 }

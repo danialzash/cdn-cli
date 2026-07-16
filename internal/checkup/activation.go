@@ -131,12 +131,6 @@ func (c *ActivationCheck) checkCNAME(state *State) []Finding {
 		Severity: SeverityHigh,
 	}
 
-	expected := state.Domain.CnameTarget
-	if state.Domain.CustomCname != "" {
-		expected = state.Domain.CustomCname
-	}
-	finding.Evidence = map[string]any{"expected_target": expected}
-
 	if state.CnameCheck == nil {
 		finding.Status = StatusError
 		finding.Summary = "Live CNAME activation check could not be loaded."
@@ -144,11 +138,30 @@ func (c *ActivationCheck) checkCNAME(state *State) []Finding {
 	}
 
 	check := state.CnameCheck
-	finding.Evidence["api_status"] = check.APIStatus
-	finding.Evidence["resolved_target"] = check.ResolvedTarget
-	finding.Evidence["live_matches"] = check.LiveMatches
+	expected := check.ExpectedTarget
+	finding.Evidence = map[string]any{
+		"expected_target": expected,
+		"api_status":      check.APIStatus,
+		"resolved_target": check.ResolvedTarget,
+		"live_matches":    check.LiveMatches,
+		"classification":  check.Classification,
+	}
 	if check.ResolveError != "" {
 		finding.Evidence["resolve_error"] = check.ResolveError
+	}
+
+	switch check.Classification {
+	case DNSLookupNotFound:
+		finding.Status = StatusFail
+		finding.Summary = "The required public CNAME record was not found."
+		return []Finding{finding}
+	case DNSLookupTimeout, DNSLookupUnavailable, DNSLookupCancelled, DNSLookupError:
+		finding.Status = StatusError
+		finding.Summary = "Live CNAME lookup could not be completed."
+		if check.ResolveError != "" {
+			finding.Details = check.ResolveError
+		}
+		return []Finding{finding}
 	}
 
 	apiActive := strings.EqualFold(check.APIStatus, "active")
@@ -168,11 +181,6 @@ func (c *ActivationCheck) checkCNAME(state *State) []Finding {
 	case check.LiveMatches:
 		finding.Status = StatusPass
 		finding.Summary = "Public CNAME target matches the expected VergeCloud target."
-		return []Finding{finding}
-	case check.ResolveError != "":
-		finding.Status = StatusError
-		finding.Summary = "Live CNAME lookup failed."
-		finding.Details = check.ResolveError
 		return []Finding{finding}
 	case apiActive && !check.LiveMatches:
 		finding.Status = StatusFail

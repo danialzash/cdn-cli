@@ -53,6 +53,7 @@ type State struct {
 	HostEdgeProbes       map[string]*HTTPProbeResult
 	HostCNAMEChains      map[string][]string
 	OriginSchemeAttempts []OriginSchemeAttempt
+	OriginSelection      OriginSelection
 
 	ApexLookup  DNSLookupResult
 	WWWLookup   DNSLookupResult
@@ -62,9 +63,10 @@ type State struct {
 }
 
 type OriginSchemeAttempt struct {
-	Scheme string `json:"scheme"`
-	Status string `json:"status"`
-	Error  string `json:"error,omitempty"`
+	Scheme  string `json:"scheme"`
+	Status  string `json:"status"`
+	Error   string `json:"error,omitempty"`
+	Address string `json:"address,omitempty"`
 }
 
 func (s *State) AddProbeError(probe, message string) {

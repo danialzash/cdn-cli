@@ -13,7 +13,7 @@ import (
 func (r *Runner) prepareState(ctx context.Context, state *State, req Requirements) {
 	domain := state.Domain.Name
 	path := state.Options.Path
-	timeout := state.Options.ProbeTimeout
+	timeout := state.Options.ProbeTimeoutDuration()
 	resolver, err := NewPublicDNSResolver(state.Options.Resolvers, timeout)
 	if err != nil {
 		state.AddProbeError("dns.resolver", err.Error())
@@ -43,6 +43,7 @@ func (r *Runner) prepareState(ctx context.Context, state *State, req Requirement
 		}
 		if req.SecondHTTPS && state.HTTPSProbe != nil && state.HTTPSProbe.Error == "" {
 			state.SecondHTTPSProbe = ProbeHTTP(ctx, client, fmt.Sprintf("https://%s%s", domain, path), "")
+			recordHTTPProbeError(state, "cache.second-https", state.SecondHTTPSProbe)
 		}
 	}
 
@@ -96,15 +97,16 @@ func (r *Runner) prepareCnameActivation(ctx context.Context, state *State, resol
 		expected = api.CustomCname
 	}
 	resolved, resolveErr := resolver.LookupCNAME(ctx, domain)
+	classification := DNSLookupFound
 	resolveErrStr := ""
 	if resolveErr != nil {
+		classification = ClassifyDNSError(resolveErr)
 		resolveErrStr = resolveErr.Error()
-		class := ClassifyDNSError(resolveErr)
-		if class.IsProbeError() {
+		if classification.IsProbeError() {
 			state.AddProbeError("activation.cname.lookup", resolveErrStr)
 		}
 	}
-	state.CnameCheck = BuildCnameCheckResult(api.Status, expected, resolved, resolveErrStr)
+	state.CnameCheck = BuildCnameCheckResult(api.Status, expected, resolved, classification, resolveErrStr)
 }
 
 func (r *Runner) prepareNSActivation(ctx context.Context, state *State, domain string) {
@@ -117,9 +119,17 @@ func (r *Runner) prepareNSActivation(ctx context.Context, state *State, domain s
 }
 
 func (r *Runner) prepareSmartCheck(ctx context.Context, state *State, domain string) {
-	if state.Inspect != nil && state.Inspect.SmartCheck != nil {
-		state.SmartCheck = state.Inspect.SmartCheck
-		return
+	if state.Inspect != nil {
+		if state.Inspect.SmartCheck != nil {
+			state.SmartCheck = state.Inspect.SmartCheck
+			return
+		}
+		if HasInspectSectionError(state.Inspect, "smart_check") {
+			for _, errItem := range InspectSectionErrors(state.Inspect, "smart_check") {
+				state.AddProbeError("smartcheck", errItem.Error)
+			}
+			return
+		}
 	}
 	sc, err := r.source.GetLatestSmartCheck(ctx, domain)
 	if err != nil {
@@ -173,7 +183,7 @@ func wwwRequired(state *State) bool {
 }
 
 func (r *Runner) verifyDNSRecords(ctx context.Context, state *State, domain string) []dnsverify.Result {
-	timeout := state.Options.ProbeTimeout
+	timeout := state.Options.ProbeTimeoutDuration()
 	checker := dnsverify.NewCheckerWithResolvers(timeout, state.Options.Resolvers)
 	records := state.Inspect.DNS.Records
 	jobs := make([]dnsverify.VerifyJob, len(records))
@@ -261,86 +271,26 @@ func lookupCNAMEChain(ctx context.Context, resolver *PublicDNSResolver, name str
 
 func (r *Runner) runOriginProbes(ctx context.Context, state *State) {
 	opts := state.Options
-	scheme := strings.ToLower(strings.TrimSpace(opts.OriginScheme))
-	if scheme == "" {
-		scheme = "auto"
-	}
-
-	port := opts.OriginPort
-	host := opts.Origin
-	if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
-		if h, p, err := net.SplitHostPort(host); err == nil {
-			host = h
-			if opts.OriginPort == 0 {
-				fmt.Sscanf(p, "%d", &port)
-			}
-		}
-	}
-	if port == 0 {
-		port = 443
-	}
-
-	dialAddress := net.JoinHostPort(host, fmt.Sprintf("%d", port))
-	path := opts.Path
 	customerDomain := state.Domain.Name
+	path := opts.Path
 
-	selectedScheme := scheme
-	if scheme == "auto" {
-		selectedScheme, state.OriginSchemeAttempts = r.selectOriginScheme(ctx, state, dialAddress, customerDomain, path, port)
-	}
+	selection := r.selectOrigin(ctx, state, customerDomain, path)
+	state.OriginSelection = selection
+	state.OriginSchemeAttempts = selection.Attempts
 
-	if port == 0 {
-		if selectedScheme == "https" {
-			port = 443
-		} else {
-			port = 80
-		}
-		dialAddress = net.JoinHostPort(host, fmt.Sprintf("%d", port))
-	}
+	scheme := selection.Scheme
+	address := selection.Address
+	tlsSNI := tlsSNIForScheme(scheme, customerDomain)
+	client := NewOriginProbeHTTPClient(opts.ProbeTimeoutDuration(), address, tlsSNI)
+	requestURL := fmt.Sprintf("%s://%s%s", scheme, address, path)
+	state.OriginProbe = mapOriginProbe(ProbeHTTP(ctx, client, requestURL, customerDomain), scheme, address, customerDomain)
 
-	requestURL := fmt.Sprintf("%s://%s%s", selectedScheme, dialAddress, path)
-	client := NewOriginProbeHTTPClient(opts.ProbeTimeout, dialAddress, customerDomain)
-	state.OriginProbe = mapOriginProbe(ProbeHTTP(ctx, client, requestURL, customerDomain), selectedScheme, dialAddress, customerDomain)
-
+	host, _, _ := net.SplitHostPort(address)
 	defaultHost := host
 	if net.ParseIP(host) != nil {
-		defaultHost = dialAddress
+		defaultHost = address
 	}
-	state.OriginHostProbe = mapOriginProbe(ProbeHTTP(ctx, client, requestURL, defaultHost), selectedScheme, dialAddress, defaultHost)
-}
-
-func (r *Runner) selectOriginScheme(ctx context.Context, state *State, dialAddress, customerDomain, path string, port int) (string, []OriginSchemeAttempt) {
-	timeout := state.Options.ProbeTimeout
-	httpsURL := fmt.Sprintf("https://%s%s", dialAddress, path)
-	httpsClient := NewOriginProbeHTTPClient(timeout, dialAddress, customerDomain)
-	httpsProbe := ProbeHTTP(ctx, httpsClient, httpsURL, customerDomain)
-
-	var attempts []OriginSchemeAttempt
-	if httpsProbe.Error == "" {
-		attempts = append(attempts, OriginSchemeAttempt{Scheme: "https", Status: "success"})
-		return "https", attempts
-	}
-	attempts = append(attempts, OriginSchemeAttempt{Scheme: "https", Status: "failed", Error: httpsProbe.Error})
-
-	if port == 443 {
-		httpPort := 80
-		if state.Options.OriginPort == 0 && strings.Contains(state.Options.Origin, ":") {
-			if _, p, err := net.SplitHostPort(state.Options.Origin); err == nil {
-				fmt.Sscanf(p, "%d", &httpPort)
-			}
-		}
-		host, _, _ := net.SplitHostPort(dialAddress)
-		httpDial := net.JoinHostPort(host, fmt.Sprintf("%d", httpPort))
-		httpURL := fmt.Sprintf("http://%s%s", httpDial, path)
-		httpClient := NewOriginProbeHTTPClient(timeout, httpDial, customerDomain)
-		httpProbe := ProbeHTTP(ctx, httpClient, httpURL, customerDomain)
-		if httpProbe.Error == "" {
-			attempts = append(attempts, OriginSchemeAttempt{Scheme: "http", Status: "success"})
-			return "http", attempts
-		}
-		attempts = append(attempts, OriginSchemeAttempt{Scheme: "http", Status: "failed", Error: httpProbe.Error})
-	}
-	return "https", attempts
+	state.OriginHostProbe = mapOriginProbe(ProbeHTTP(ctx, client, requestURL, defaultHost), scheme, address, defaultHost)
 }
 
 func mapOriginProbe(result *HTTPProbeResult, scheme, address, hostHeader string) *OriginProbeResult {

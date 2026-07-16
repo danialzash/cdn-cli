@@ -222,6 +222,26 @@ func TestOnlyCacheDoesNotIncludeHTTPCheck(t *testing.T) {
 	}
 }
 
+func TestSmartCheckInspectFailureNoRetry(t *testing.T) {
+	var calls int32
+	source := &fakeSource{
+		onSmartCheck: func() { atomic.AddInt32(&calls, 1) },
+	}
+	runner, _ := NewRunner(source)
+	state := &State{
+		Inspect: &client.DomainInspect{
+			Errors: []client.InspectError{{Section: "smart_check", Error: "timeout"}},
+		},
+	}
+	runner.prepareSmartCheck(context.Background(), state, "example.com")
+	if atomic.LoadInt32(&calls) != 0 {
+		t.Fatalf("expected 0 direct smartcheck calls, got %d", calls)
+	}
+	if len(state.ProbeErrors) != 1 {
+		t.Fatalf("probe errors = %+v", state.ProbeErrors)
+	}
+}
+
 func TestSmartCheckLoadedOnceFromInspect(t *testing.T) {
 	var calls int32
 	source := &fakeSource{

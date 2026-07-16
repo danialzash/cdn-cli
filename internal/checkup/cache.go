@@ -59,9 +59,15 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 		}
 	}
 
-	if state.HTTPSProbe == nil || state.SecondHTTPSProbe == nil ||
-		state.HTTPSProbe.Error != "" || state.SecondHTTPSProbe.Error != "" ||
-		state.HTTPSProbe.ProbeExecError || state.SecondHTTPSProbe.ProbeExecError {
+	if state.HTTPSProbe == nil || state.HTTPSProbe.Error != "" || state.HTTPSProbe.ProbeExecError {
+		return findings
+	}
+	if state.SecondHTTPSProbe == nil {
+		findings = append(findings, cacheRepeatedProbeError(state, "The repeated-request cache probe did not run.", nil))
+		return findings
+	}
+	if state.SecondHTTPSProbe.Error != "" || state.SecondHTTPSProbe.ProbeExecError {
+		findings = append(findings, cacheRepeatedProbeError(state, "The repeated-request cache probe could not be completed.", state.SecondHTTPSProbe))
 		return findings
 	}
 
@@ -117,6 +123,23 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 	}
 
 	return findings
+}
+
+func cacheRepeatedProbeError(state *State, summary string, second *HTTPProbeResult) Finding {
+	evidence := map[string]any{}
+	if state.HTTPSProbe != nil {
+		evidence["first_probe_status"] = state.HTTPSProbe.StatusCode
+	}
+	if second != nil {
+		evidence["second_probe_error"] = second.Error
+		evidence["second_probe_timed_out"] = second.TimedOut
+	}
+	return Finding{
+		ID: "cache.repeated-request", Category: string(CategoryCache),
+		Status: StatusError, Severity: SeverityMedium,
+		Title: "Repeated request cache behavior", Summary: summary,
+		Evidence: evidence,
+	}
 }
 
 func (c *CacheCheck) cacheConfigFinding(state *State) []Finding {

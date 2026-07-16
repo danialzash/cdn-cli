@@ -50,8 +50,8 @@ origin tests. Read-only by default; pass --fix to review and apply safe fixes.`,
 			opts.Origin = strings.TrimSpace(origin)
 			opts.OriginPort = originPort
 			opts.OriginScheme = originScheme
-			opts.Timeout = timeout
-			opts.ProbeTimeout = probeTimeout
+			opts.Timeout = checkup.DurationJSON(timeout)
+			opts.ProbeTimeout = checkup.DurationJSON(probeTimeout)
 			opts.Resolvers = resolvers
 			opts.Strict = strict
 			opts.Fix = fix
@@ -76,7 +76,7 @@ origin tests. Read-only by default; pass --fix to review and apply safe fixes.`,
 			runner, err := checkup.NewRunner(source)
 			exitOnError(err)
 
-			withCheckupContext(opts.Timeout, func(ctx context.Context) (int, error) {
+			exitCode, err := withCheckupContext(opts.TimeoutDuration(), func(ctx context.Context) (int, error) {
 				result := runner.Run(ctx, domainArg, opts)
 				if result.Err != nil {
 					return checkup.ExitError, result.Err
@@ -118,6 +118,7 @@ origin tests. Read-only by default; pass --fix to review and apply safe fixes.`,
 
 				return result.Report.ExitCode, nil
 			})
+			finishCheckup(exitCode, err)
 		},
 	}
 

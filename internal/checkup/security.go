@@ -27,11 +27,25 @@ func (c *SecurityCheck) Run(_ context.Context, state *State) []Finding {
 		}}
 	}
 
+	findings = append(findings, c.sslAPIFinding(state)...)
 	findings = append(findings, c.wafFinding(domain, state)...)
 	findings = append(findings, c.firewallFinding(state)...)
 	findings = append(findings, c.hstsFinding(domain, state)...)
 	findings = append(findings, c.securityHeadersFinding(state)...)
 
+	return findings
+}
+
+func (c *SecurityCheck) sslAPIFinding(state *State) []Finding {
+	if state.Inspect == nil || !HasInspectSectionError(state.Inspect, "ssl") {
+		return nil
+	}
+	var findings []Finding
+	for _, errItem := range InspectSectionErrors(state.Inspect, "ssl") {
+		f := inspectSectionErrorFinding("security.ssl-api", string(CategorySecurity), errItem.Section, "SSL configuration")
+		f.Evidence["error"] = errItem.Error
+		findings = append(findings, f)
+	}
 	return findings
 }
 
@@ -157,11 +171,22 @@ func (c *SecurityCheck) hstsFinding(domain string, state *State) []Finding {
 			f.Status = StatusPass
 			f.Summary = "Strict-Transport-Security header was observed on the public HTTPS response."
 		} else if httpsOK {
-			f.Status = StatusSkip
-			f.Summary = "HSTS API comparison skipped because SSL configuration could not be loaded."
+			f.Status = StatusWarn
+			f.Summary = "No Strict-Transport-Security header was observed; SSL API comparison is unavailable."
 		} else {
 			f.Status = StatusSkip
-			f.Summary = "HSTS check skipped because HTTPS is unavailable."
+			f.Summary = "HSTS cannot be meaningfully evaluated because HTTPS is unavailable."
+		}
+		return []Finding{f}
+	}
+
+	if !httpsOK || !tlsOK {
+		if header != "" {
+			f.Status = StatusPass
+			f.Summary = "Strict-Transport-Security header was observed on the public HTTPS response."
+		} else {
+			f.Status = StatusSkip
+			f.Summary = "HSTS cannot be meaningfully evaluated because HTTPS is unavailable."
 		}
 		return []Finding{f}
 	}

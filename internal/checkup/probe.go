@@ -154,6 +154,7 @@ func ProbeHTTP(ctx context.Context, client *http.Client, rawURL string, hostHead
 		result.ProbeExecError = true
 		return result
 	}
+	initialHost := redirectHost(rawURL)
 	req.Header.Set("User-Agent", version.UserAgent+"-checkup")
 	if hostHeader != "" {
 		req.Host = hostHeader
@@ -216,7 +217,7 @@ func ProbeHTTP(ctx context.Context, client *http.Client, rawURL string, hostHead
 			result.ProbeExecError = true
 		}
 		result.Error = err.Error()
-		result.RedirectEvidence = buildRedirectEvidence(rawURL, redirects, "", 0, result, "")
+		result.RedirectEvidence = buildRedirectEvidence(rawURL, redirects, "", 0, result, initialHost)
 		return result
 	}
 	defer resp.Body.Close()
@@ -226,13 +227,13 @@ func ProbeHTTP(ctx context.Context, client *http.Client, rawURL string, hostHead
 	result.RedirectChain = redirects
 	result.Headers = FilterSafeHeaders(resp.Header)
 	result.AnalysisHeaders = FilterAnalysisHeaders(resp.Header)
-	result.RedirectEvidence = buildRedirectEvidence(rawURL, redirects, result.FinalURL, result.StatusCode, result, resp.Request.URL.Hostname())
+	result.RedirectEvidence = buildRedirectEvidence(rawURL, redirects, result.FinalURL, result.StatusCode, result, initialHost)
 
 	_, _ = io.CopyN(io.Discard, resp.Body, maxBodyRead)
 	return result
 }
 
-func buildRedirectEvidence(initial string, chain []string, final string, status int, probe *HTTPProbeResult, domain string) RedirectEvidence {
+func buildRedirectEvidence(initial string, chain []string, final string, status int, probe *HTTPProbeResult, expectedHost string) RedirectEvidence {
 	ev := RedirectEvidence{
 		InitialURL:       initial,
 		RedirectChain:    append([]string(nil), chain...),
@@ -243,7 +244,7 @@ func buildRedirectEvidence(initial string, chain []string, final string, status 
 	}
 
 	for _, hop := range chain {
-		if host := redirectHost(hop); host != "" && !hostsRelated(domain, host) {
+		if host := redirectHost(hop); host != "" && !hostsRelated(expectedHost, host) {
 			ev.UnexpectedHosts = appendUnique(ev.UnexpectedHosts, host)
 		}
 	}
@@ -258,7 +259,7 @@ func buildRedirectEvidence(initial string, chain []string, final string, status 
 	}
 
 	if final != "" {
-		if host := redirectHost(final); host != "" && !hostsRelated(domain, host) {
+		if host := redirectHost(final); host != "" && !hostsRelated(expectedHost, host) {
 			ev.UnexpectedHosts = appendUnique(ev.UnexpectedHosts, host)
 		}
 		finalScheme := schemeOf(final)

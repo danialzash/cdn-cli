@@ -2,12 +2,55 @@ package checkup
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestProbeHTTPUnexpectedRedirectHostUsesInitialHost(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "https://unrelated.example/", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	client := NewProbeHTTPClient(5 * time.Second)
+	result := ProbeHTTP(context.Background(), client, srv.URL, "")
+	if len(result.RedirectEvidence.UnexpectedHosts) == 0 {
+		t.Fatalf("expected unexpected host warning, got %+v err=%q", result.RedirectEvidence, result.Error)
+	}
+}
+
+func TestProbeHTTPRedirectToWWWAccepted(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "https://www.example.com/", http.StatusFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := NewProbeHTTPClient(5 * time.Second)
+	result := ProbeHTTP(context.Background(), client, "http://example.com/", "")
+	if len(result.RedirectEvidence.UnexpectedHosts) != 0 {
+		t.Fatalf("www redirect should be accepted, got %+v", result.RedirectEvidence.UnexpectedHosts)
+	}
+}
+
+func TestOptionsJSONDurationStrings(t *testing.T) {
+	opts := DefaultOptions()
+	data, err := json.Marshal(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(data)
+	if !strings.Contains(out, `"timeout":"1m0s"`) || !strings.Contains(out, `"probe_timeout":"10s"`) {
+		t.Fatalf("got %s", out)
+	}
+}
 
 func TestProbeHTTPRedirectLoop(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

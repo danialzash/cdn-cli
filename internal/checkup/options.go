@@ -15,19 +15,19 @@ const (
 )
 
 type Options struct {
-	Only         []Category    `json:"only,omitempty"`
-	Skip         []Category    `json:"skip,omitempty"`
-	Path         string        `json:"path"`
-	Origin       string        `json:"origin,omitempty"`
-	OriginPort   int           `json:"origin_port,omitempty"`
-	OriginScheme string        `json:"origin_scheme"`
-	Timeout      time.Duration `json:"timeout"`
-	ProbeTimeout time.Duration `json:"probe_timeout"`
-	Resolvers    []string      `json:"resolvers,omitempty"`
-	Strict       bool          `json:"strict"`
-	Fix          bool          `json:"fix"`
-	Yes          bool          `json:"yes"`
-	DryRun       bool          `json:"dry_run"`
+	Only         []Category   `json:"only,omitempty"`
+	Skip         []Category   `json:"skip,omitempty"`
+	Path         string       `json:"path"`
+	Origin       string       `json:"origin,omitempty"`
+	OriginPort   int          `json:"origin_port,omitempty"`
+	OriginScheme string       `json:"origin_scheme"`
+	Timeout      DurationJSON `json:"timeout"`
+	ProbeTimeout DurationJSON `json:"probe_timeout"`
+	Resolvers    []string     `json:"resolvers,omitempty"`
+	Strict       bool         `json:"strict"`
+	Fix          bool         `json:"fix"`
+	Yes          bool         `json:"yes"`
+	DryRun       bool         `json:"dry_run"`
 }
 
 func ParseCategories(values []string) ([]Category, error) {
@@ -97,10 +97,10 @@ func (o Options) Validate() error {
 			return fmt.Errorf("invalid --resolver: %w", err)
 		}
 	}
-	if o.Timeout <= 0 {
+	if time.Duration(o.Timeout) <= 0 {
 		return fmt.Errorf("--timeout must be positive")
 	}
-	if o.ProbeTimeout <= 0 {
+	if time.Duration(o.ProbeTimeout) <= 0 {
 		return fmt.Errorf("--probe-timeout must be positive")
 	}
 	return nil
@@ -142,7 +142,15 @@ func DefaultOptions() Options {
 	return Options{
 		Path:         DefaultPath,
 		OriginScheme: "auto",
-		Timeout:      DefaultTimeout,
-		ProbeTimeout: DefaultProbeTimeout,
+		Timeout:      DurationJSON(DefaultTimeout),
+		ProbeTimeout: DurationJSON(DefaultProbeTimeout),
 	}
+}
+
+func (o Options) TimeoutDuration() time.Duration {
+	return time.Duration(o.Timeout)
+}
+
+func (o Options) ProbeTimeoutDuration() time.Duration {
+	return time.Duration(o.ProbeTimeout)
 }

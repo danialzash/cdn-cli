@@ -52,19 +52,35 @@ func (c *OriginCheck) connectivityFinding(state *State) []Finding {
 	status, severity, summary := ClassifyHTTPStatus(state.OriginProbe.StatusCode, state.Options.Path, healthPath)
 	f.Status = status
 	f.Severity = severity
+	scheme := state.OriginProbe.Scheme
+	if scheme == "" && state.OriginSelection.Scheme != "" {
+		scheme = state.OriginSelection.Scheme
+	}
+	sniNote := ""
+	if scheme == "https" {
+		sniNote = fmt.Sprintf(" (TLS SNI: %s)", state.Domain.Name)
+	}
 	f.Summary = fmt.Sprintf(
-		"%s Origin returned HTTP %d in %s with Host: %s (TLS SNI: %s).",
+		"%s Origin returned HTTP %d in %s with Host: %s%s.",
 		summary,
 		state.OriginProbe.StatusCode,
 		state.OriginProbe.TotalDuration.Round(1),
 		state.OriginProbe.HostHeader,
-		state.Domain.Name,
+		sniNote,
 	)
 	f.Evidence = map[string]any{
-		"address":     state.OriginProbe.Address,
-		"status_code": state.OriginProbe.StatusCode,
-		"host_header": state.OriginProbe.HostHeader,
-		"tls_sni":     state.Domain.Name,
+		"address":          state.OriginProbe.Address,
+		"status_code":      state.OriginProbe.StatusCode,
+		"host_header":      state.OriginProbe.HostHeader,
+		"selected_scheme":  scheme,
+		"selected_address": state.OriginSelection.Address,
+		"selected_port":    state.OriginSelection.Port,
+	}
+	if len(state.OriginSchemeAttempts) > 0 {
+		f.Evidence["auto_scheme_attempts"] = state.OriginSchemeAttempts
+	}
+	if scheme == "https" {
+		f.Evidence["tls_sni"] = state.Domain.Name
 	}
 	return []Finding{f}
 }

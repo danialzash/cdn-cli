@@ -3,6 +3,7 @@ package dnsverify
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -21,7 +22,11 @@ func NormalizeResolverAddress(value string) (string, error) {
 		if host == "" || port == "" {
 			return "", fmt.Errorf("invalid resolver address %q", value)
 		}
-		return net.JoinHostPort(host, port), nil
+		portNumber, err := strconv.Atoi(port)
+		if err != nil || portNumber < 1 || portNumber > 65535 {
+			return "", fmt.Errorf("invalid resolver port %q", port)
+		}
+		return net.JoinHostPort(host, strconv.Itoa(portNumber)), nil
 	}
 
 	unbracketed := strings.Trim(value, "[]")

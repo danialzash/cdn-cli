@@ -25,10 +25,10 @@ func NewPublicDNSResolver(resolvers []string, timeout time.Duration) (*PublicDNS
 	return &PublicDNSResolver{servers: servers, timeout: timeout}, nil
 }
 
-func (r *PublicDNSResolver) dial(ctx context.Context, network string) (net.Conn, error) {
+func (r *PublicDNSResolver) dial(ctx context.Context, network, defaultAddress string) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: r.timeout}
 	if len(r.servers) == 0 {
-		return dialer.DialContext(ctx, network, "")
+		return dialer.DialContext(ctx, network, defaultAddress)
 	}
 	index := publicResolverDialIndex.Add(1) - 1
 	server := r.servers[index%uint64(len(r.servers))]
@@ -39,7 +39,7 @@ func (r *PublicDNSResolver) resolver() *net.Resolver {
 	return &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			return r.dial(ctx, network)
+			return r.dial(ctx, network, address)
 		},
 	}
 }
@@ -83,13 +83,14 @@ func cnameTargetMatches(resolved, expected string) bool {
 	return dnsverify.CnameTargetMatches(resolved, expected)
 }
 
-func BuildCnameCheckResult(apiStatus, expected, resolved, resolveErr string) *CnameCheckResult {
+func BuildCnameCheckResult(apiStatus, expected, resolved string, classification DNSLookupClassification, resolveErr string) *CnameCheckResult {
 	liveMatches := cnameTargetMatches(resolved, expected)
 	return &CnameCheckResult{
 		APIStatus:      apiStatus,
 		ExpectedTarget: expected,
 		ResolvedTarget: resolved,
 		LiveMatches:    liveMatches,
+		Classification: classification,
 		ResolveError:   resolveErr,
 	}
 }
@@ -100,5 +101,6 @@ type CnameCheckResult struct {
 	ExpectedTarget string
 	ResolvedTarget string
 	LiveMatches    bool
+	Classification DNSLookupClassification
 	ResolveError   string
 }

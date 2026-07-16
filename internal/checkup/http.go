@@ -21,10 +21,10 @@ func (c *HTTPCheck) Run(_ context.Context, state *State) []Finding {
 	findings = append(findings, c.probeFinding("http.https-availability", "HTTPS availability", state.HTTPSProbe, fmt.Sprintf("https://%s%s", domain, path), healthPath)...)
 
 	if state.HTTPProbe != nil {
-		findings = append(findings, redirectEvidenceFindings("http", CategoryHTTP, domain, state.HTTPProbe.RedirectEvidence)...)
+		findings = append(findings, redirectEvidenceFindings("http", CategoryHTTP, redirectHost(fmt.Sprintf("http://%s%s", domain, path)), state.HTTPProbe.RedirectEvidence)...)
 	}
 	if state.HTTPSProbe != nil {
-		findings = append(findings, redirectEvidenceFindings("https", CategoryHTTP, domain, state.HTTPSProbe.RedirectEvidence)...)
+		findings = append(findings, redirectEvidenceFindings("https", CategoryHTTP, redirectHost(fmt.Sprintf("https://%s%s", domain, path)), state.HTTPSProbe.RedirectEvidence)...)
 	}
 
 	findings = append(findings, c.redirectToHTTPSFinding(state)...)
@@ -74,45 +74,49 @@ func (c *HTTPCheck) probeFinding(id, title string, probe *HTTPProbeResult, url s
 }
 
 func (c *HTTPCheck) redirectToHTTPSFinding(state *State) []Finding {
-	f := Finding{
-		ID:       "http.redirect-to-https",
-		Category: string(CategoryHTTP),
-		Title:    "HTTP to HTTPS redirect",
-		Severity: SeverityMedium,
-	}
-
 	if state.HTTPProbe == nil || state.HTTPSProbe == nil {
-		f.Status = StatusSkip
-		f.Summary = "Redirect check skipped because HTTP or HTTPS probe did not run."
-		return []Finding{f}
+		return []Finding{{
+			ID: "http.redirect-to-https", Category: string(CategoryHTTP),
+			Status: StatusSkip, Severity: SeverityInfo, Title: "HTTP to HTTPS redirect",
+			Summary: "Redirect check skipped because HTTP or HTTPS probe did not run.",
+		}}
 	}
 	if state.HTTPProbe.ProbeExecError || state.HTTPSProbe.ProbeExecError {
-		f.Status = StatusSkip
-		f.Summary = "Redirect check skipped because HTTP or HTTPS probe could not be executed."
-		return []Finding{f}
+		return []Finding{{
+			ID: "http.redirect-to-https", Category: string(CategoryHTTP),
+			Status: StatusSkip, Severity: SeverityInfo, Title: "HTTP to HTTPS redirect",
+			Summary: "Redirect check skipped because HTTP or HTTPS probe could not be executed.",
+		}}
+	}
+
+	sslAPIAvailable := state.Inspect != nil && !HasInspectSectionError(state.Inspect, "ssl")
+	if !sslAPIAvailable {
+		return []Finding{{
+			ID: "http.ssl-api", Category: string(CategoryHTTP),
+			Status: StatusError, Severity: SeverityMedium, Title: "SSL configuration",
+			Summary: "HTTPS redirect configuration could not be loaded from the VergeCloud API.",
+		}}
 	}
 
 	httpsOK := state.HTTPSProbe.Error == "" && state.HTTPSProbe.StatusCode >= 200 && state.HTTPSProbe.StatusCode < 400
 	tlsOK := state.TLSProbe != nil && state.TLSProbe.Connected && state.TLSProbe.HostnameMatch && !state.TLSProbe.Expired
 	redirectObserved := httpRedirectsToHTTPS(state.HTTPProbe)
+	sslRedirectEnabled := state.Inspect.SSL.HTTPSRedirect
 
-	sslRedirectEnabled := false
-	if state.Inspect != nil && !HasInspectSectionError(state.Inspect, "ssl") {
-		sslRedirectEnabled = state.Inspect.SSL.HTTPSRedirect
-	}
-
-	f.Evidence = map[string]any{
-		"api_https_redirect": sslRedirectEnabled,
-		"redirect_observed":  redirectObserved,
-		"http_final_url":     state.HTTPProbe.FinalURL,
-		"http_status":        state.HTTPProbe.StatusCode,
+	f := Finding{
+		ID: "http.redirect-to-https", Category: string(CategoryHTTP),
+		Title: "HTTP to HTTPS redirect", Severity: SeverityMedium,
+		Evidence: map[string]any{
+			"api_https_redirect": sslRedirectEnabled,
+			"redirect_observed":  redirectObserved,
+			"http_final_url":     state.HTTPProbe.FinalURL,
+			"http_status":        state.HTTPProbe.StatusCode,
+		},
 	}
 	if len(state.HTTPProbe.RedirectChain) > 0 {
 		f.Evidence["redirect_chain"] = state.HTTPProbe.RedirectChain
 	}
-	if state.HTTPSProbe != nil {
-		f.Evidence["edge_evidence"] = DetectEdgeEvidence(state.HTTPSProbe.AnalysisHeaders)
-	}
+	f.Evidence["edge_evidence"] = DetectEdgeEvidence(state.HTTPSProbe.AnalysisHeaders)
 
 	switch {
 	case sslRedirectEnabled && redirectObserved && httpsOK:
@@ -122,6 +126,10 @@ func (c *HTTPCheck) redirectToHTTPSFinding(state *State) []Finding {
 		f.Status = StatusWarn
 		f.Summary = "HTTPS redirect is enabled in VergeCloud, but the live HTTP response did not redirect to HTTPS."
 		f.Details = "The setting may not have propagated, may be overridden by another rule, or the request may not be reaching the expected edge."
+	case !sslRedirectEnabled && redirectObserved && httpsOK:
+		f.Status = StatusPass
+		f.Summary = "HTTP redirects to HTTPS even though VergeCloud HTTPS redirect is disabled."
+		f.Details = "Redirect may be implemented by an origin redirect, page rule, or another configuration layer."
 	case !sslRedirectEnabled && httpsOK && tlsOK:
 		f.Status = StatusWarn
 		f.Summary = "HTTPS is healthy but HTTP to HTTPS redirect is not enabled in VergeCloud."
