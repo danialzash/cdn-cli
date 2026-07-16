@@ -36,6 +36,7 @@ verge auth api-key
 verge auth login --api-key <your-api-key>
 verge auth status
 verge domains list
+verge domains checkup example.com --json
 ```
 
 Or use environment variables (no config file):

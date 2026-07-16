@@ -223,50 +223,13 @@ func (c *Client) InspectDomain(ctx context.Context, domain string) (*DomainInspe
 		return nil
 	})
 
-	run("waf_settings", func() error {
-		settings, err := c.sdk.GetWafSettings(ctx, domain)
-		if err != nil {
-			return err
-		}
-		mode := settings.Mode
-		if mode == "" {
-			mode = "off"
-		}
-		mu.Lock()
-		result.WAF.Enabled = settings.IsEnabled
-		result.WAF.Mode = mode
-		mu.Unlock()
-		return nil
-	})
-
-	run("waf_packages", func() error {
-		resp, err := c.sdk.ListDomainWafPackages(ctx, domain)
+	run("waf", func() error {
+		waf, err := c.fetchWafInspect(ctx, domain)
 		if err != nil {
 			return err
 		}
 		mu.Lock()
-		mode := result.WAF.Mode
-		if mode == "" {
-			mode = "off"
-		}
-		packages := make([]WafPackage, 0, len(resp.Data))
-		for _, pkg := range resp.Data {
-			status := "disabled"
-			enabled := false
-			if pkg.IsEnabled != nil && *pkg.IsEnabled {
-				status = "enabled"
-				enabled = true
-			}
-			packages = append(packages, WafPackage{
-				ID:      pkg.ID,
-				Name:    pkg.Name,
-				Mode:    mode,
-				Status:  status,
-				Enabled: enabled,
-			})
-		}
-		result.WAF.PackageCount = len(packages)
-		result.WAF.Packages = packages
+		result.WAF = *waf
 		mu.Unlock()
 		return nil
 	})

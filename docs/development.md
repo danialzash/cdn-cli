@@ -55,6 +55,7 @@ cmd/verge/           CLI entrypoint
 cmd/gendocs/         Man page generator
 internal/cmd/        Cobra commands (thin handlers)
 internal/client/     Stable API wrapper used by commands
+internal/checkup/    Domain diagnostic engine (checkup command)
 internal/sdk/        Low-level HTTP SDK + OpenAPI spec
 internal/config/     Viper-backed config management
 internal/output/     Table/JSON rendering (lipgloss + tablewriter)
@@ -69,6 +70,26 @@ Design rules:
 - The OpenAPI spec is stored at `internal/sdk/openapi.yaml` for code generation (`make generate`).
 - All API calls use `context.Context`.
 - List endpoints automatically paginate when the API returns page metadata.
+- Diagnostic logic for `domains checkup` lives in `internal/checkup/`; commands stay thin.
+
+## Domain checkup
+
+The checkup feature combines VergeCloud API data with live probes (DNS, HTTP, TLS, optional origin).
+
+```text
+internal/checkup/   models, registry, runner, category checks, fix plans
+internal/client/    selective inspect loading, activation API wrappers, fix mutations
+internal/output/    human and JSON report rendering
+internal/cmd/       flags, signal-aware context, fix confirmation
+```
+
+Run unit tests (no network required):
+
+```bash
+go test ./internal/checkup/...
+```
+
+Integration tests against live APIs or public DNS are not part of default `go test ./...`.
 
 ## Extending the CLI
 

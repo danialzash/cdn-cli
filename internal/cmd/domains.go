@@ -16,7 +16,7 @@ func newDomainsCmd() *cobra.Command {
 		Aliases: []string{"domain"},
 	}
 
-	cmd.AddCommand(newDomainsListCmd(), newDomainsGetCmd(), newDomainsInspectCmd())
+	cmd.AddCommand(newDomainsListCmd(), newDomainsGetCmd(), newDomainsInspectCmd(), newDomainsCheckupCmd())
 	return cmd
 }
 

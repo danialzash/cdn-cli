@@ -40,7 +40,7 @@ GETTING STARTED
 COMMAND GROUPS
 
   auth              Login, logout, and check authentication status
-  domains           List, get, and inspect domains
+  domains           List, get, inspect, and diagnose domains
   dns               List, add, update, delete, and verify DNS records
   firewall          Manage firewall rules (list, get, add, update, delete)
   page-rules        Manage page rules
