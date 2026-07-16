@@ -55,25 +55,7 @@ COMMAND GROUPS
   getting-started   Install, authenticate, and first commands
   version           Print CLI version
 
-REPORTS
-
-  verge reports list
-  verge reports traffic DOMAIN [--period 24h|7d|30d]
-  verge reports request-summary DOMAIN   Request saved/missed/bypassed breakdown
-  verge reports traffic-summary DOMAIN   Traffic saved/missed/bypassed breakdown
-  verge reports traffic-saved DOMAIN     Both request and traffic summaries
-  verge reports status DOMAIN              HTTP status code reports
-  verge reports visitors DOMAIN
-  verge reports attacks DOMAIN
-  verge reports aggregated details --domains a.com,b.com
-  verge reports domains-download [--output file.csv]
-
-WAF
-
-  verge waf packages                       List global packages (crs, comodo, default)
-  verge waf get PACKAGE-ID                 Package details and rulesets
-  verge waf DOMAIN                         Domain WAF configuration
-  verge waf update DOMAIN --mode MODE      Update mode (off, detect, protect)
+Run verge reports --help or verge waf --help for subcommands.
 
 GLOBAL FLAGS
 
