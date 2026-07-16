@@ -458,12 +458,88 @@ func (p *Printer) PrintWafPackages(packages []client.WafPackage) error {
 		return p.PrintJSON(packages)
 	}
 
-	table := p.newTable([]string{"ID", "NAME", "MODE", "STATUS"})
+	table := p.newTable([]string{"ID", "NAME", "STATUS"})
 	for _, pkg := range packages {
-		table.Append([]string{pkg.ID, pkg.Name, pkg.Mode, pkg.Status})
+		status := pkg.Status
+		if status == "" {
+			status = "-"
+		}
+		table.Append([]string{pkg.ID, pkg.Name, status})
 	}
 	table.Render()
 	return nil
+}
+
+func (p *Printer) PrintWafSettings(settings *client.WafSettings) error {
+	if p.JSON {
+		return p.PrintJSON(settings)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("WAF Settings"))
+	table := p.newTable([]string{"FIELD", "VALUE"})
+	table.Append([]string{"Enabled", boolLabel(settings.IsEnabled)})
+	table.Append([]string{"Mode", wafModeLabel(settings.Mode)})
+	table.Render()
+
+	if len(settings.Packages) > 0 {
+		fmt.Fprintln(p.Out)
+		fmt.Fprintln(p.Out, titleStyle.Render("Domain Packages"))
+		pkgTable := p.newTable([]string{"ID", "NAME", "STATUS"})
+		for _, pkg := range settings.Packages {
+			pkgTable.Append([]string{pkg.ID, pkg.Name, pkg.Status})
+		}
+		pkgTable.Render()
+	}
+	return nil
+}
+
+func (p *Printer) PrintWafPackageDetails(details *client.WafPackageDetails) error {
+	if p.JSON {
+		return p.PrintJSON(details)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("WAF Package"))
+	info := p.newTable([]string{"FIELD", "VALUE"})
+	info.Append([]string{"ID", details.ID})
+	info.Append([]string{"Name", details.Name})
+	if details.ProviderName != "" {
+		info.Append([]string{"Provider", details.ProviderName})
+	}
+	info.Render()
+
+	if len(details.Rulesets) == 0 {
+		return nil
+	}
+
+	fmt.Fprintln(p.Out)
+	fmt.Fprintln(p.Out, titleStyle.Render("Rulesets"))
+	for _, ruleset := range details.Rulesets {
+		fmt.Fprintln(p.Out, mutedStyle.Render(fmt.Sprintf("%s (%s)", ruleset.Name, ruleset.ID)))
+		if len(ruleset.Rules) == 0 {
+			fmt.Fprintln(p.Out, mutedStyle.Render("  no rules"))
+			continue
+		}
+		ruleTable := p.newTable([]string{"ID", "NAME"})
+		for _, rule := range ruleset.Rules {
+			ruleTable.Append([]string{rule.ID, rule.Name})
+		}
+		ruleTable.Render()
+		fmt.Fprintln(p.Out)
+	}
+	return nil
+}
+
+func wafModeLabel(mode string) string {
+	switch mode {
+	case "off":
+		return mutedStyle.Render("off")
+	case "detect":
+		return warnStyle.Render("detect")
+	case "protect":
+		return okStyle.Render("protect")
+	default:
+		return emptyDash(mode)
+	}
 }
 
 func (p *Printer) PrintSmartCheck(check *client.SmartCheck) error {

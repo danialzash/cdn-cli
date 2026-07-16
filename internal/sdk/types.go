@@ -129,7 +129,8 @@ type WafPreset struct {
 }
 
 type WafPresets struct {
-	Presets []WafPreset `json:"presets"`
+	Presets  []WafPreset  `json:"presets"`
+	Packages []WafPackage `json:"packages"`
 }
 
 type WafPresetsResponse struct {
@@ -141,8 +142,9 @@ type DomainWafPackagesResponse struct {
 }
 
 type WafSettings struct {
-	Mode      string `json:"mode"`
-	IsEnabled bool   `json:"is_enabled"`
+	Mode      string       `json:"mode"`
+	IsEnabled bool         `json:"is_enabled"`
+	Packages  []WafPackage `json:"packages,omitempty"`
 }
 
 type WafSettingsResponse struct {

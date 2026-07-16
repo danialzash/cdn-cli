@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/vergecloud/cdn-cli/internal/sdk"
@@ -150,76 +149,6 @@ func (c *Client) ListFirewallRules(ctx context.Context, domainID string) ([]Fire
 	}
 
 	return all, nil
-}
-
-func (c *Client) ListWafPackages(ctx context.Context, domain string) ([]WafPackage, error) {
-	if domain != "" {
-		return c.listDomainWafPackages(ctx, domain)
-	}
-	return c.listGlobalWafPackages(ctx)
-}
-
-func (c *Client) listGlobalWafPackages(ctx context.Context) ([]WafPackage, error) {
-	resp, err := c.sdk.ListWafPresets(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	seen := make(map[string]struct{})
-	var packages []WafPackage
-
-	for _, preset := range resp.Data.Presets {
-		for _, pkg := range preset.Packages {
-			if _, ok := seen[pkg.ID]; ok {
-				continue
-			}
-			seen[pkg.ID] = struct{}{}
-			packages = append(packages, WafPackage{
-				ID:     pkg.ID,
-				Name:   pkg.Name,
-				Mode:   "-",
-				Status: "catalog",
-			})
-		}
-	}
-
-	return packages, nil
-}
-
-func (c *Client) listDomainWafPackages(ctx context.Context, domain string) ([]WafPackage, error) {
-	settings, err := c.sdk.GetWafSettings(ctx, domain)
-	if err != nil {
-		return nil, fmt.Errorf("load WAF settings: %w", err)
-	}
-
-	resp, err := c.sdk.ListDomainWafPackages(ctx, domain)
-	if err != nil {
-		return nil, err
-	}
-
-	mode := settings.Mode
-	if mode == "" {
-		mode = "off"
-	}
-
-	var packages []WafPackage
-	for _, pkg := range resp.Data {
-		status := "disabled"
-		enabled := false
-		if pkg.IsEnabled != nil && *pkg.IsEnabled {
-			status = "enabled"
-			enabled = true
-		}
-		packages = append(packages, WafPackage{
-			ID:      pkg.ID,
-			Name:    pkg.Name,
-			Mode:    mode,
-			Status:  status,
-			Enabled: enabled,
-		})
-	}
-
-	return packages, nil
 }
 
 func (c *Client) GetLatestSmartCheck(ctx context.Context, domain string) (*SmartCheck, error) {
