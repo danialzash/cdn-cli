@@ -13,11 +13,39 @@ type FirewallSettingsResponse struct {
 }
 
 type CacheSettings struct {
-	CacheStatus         string `json:"cache_status"`
-	CacheMaxAge         string `json:"cache_max_age"`
-	CacheDeveloperMode  bool   `json:"cache_developer_mode"`
-	CacheMaxSize        int64  `json:"cache_max_size"`
-	CacheConsistentUptime bool `json:"cache_consistent_uptime"`
+	CacheStatus          string `json:"cache_status"`
+	CacheMaxAge          string `json:"cache_max_age"`
+	CacheDeveloperMode   bool   `json:"cache_developer_mode"`
+	CacheMaxSize         int64  `json:"cache_max_size"`
+	CacheConsistentUptime bool  `json:"cache_consistent_uptime"`
+	CachePageAny         string `json:"cache_page_any,omitempty"`
+	CacheBrowser         string `json:"cache_browser,omitempty"`
+	CacheScheme          bool   `json:"cache_scheme,omitempty"`
+	CacheBypassOnCookie  bool   `json:"cache_bypass_on_cookie,omitempty"`
+	CacheCookie          string `json:"cache_cookie,omitempty"`
+	CacheArgs            bool   `json:"cache_args,omitempty"`
+	CacheArg             string `json:"cache_arg,omitempty"`
+}
+
+type UpdateCacheSettingsRequest struct {
+	CacheDeveloperMode    *bool   `json:"cache_developer_mode,omitempty"`
+	CacheConsistentUptime *bool   `json:"cache_consistent_uptime,omitempty"`
+	CacheMaxSize          *int64  `json:"cache_max_size,omitempty"`
+	CacheStatus           *string `json:"cache_status,omitempty"`
+	CacheMaxAge           *string `json:"cache_max_age,omitempty"`
+	CachePageAny          *string `json:"cache_page_any,omitempty"`
+	CacheBrowser          *string `json:"cache_browser,omitempty"`
+	CacheScheme           *bool   `json:"cache_scheme,omitempty"`
+	CacheBypassOnCookie   *bool   `json:"cache_bypass_on_cookie,omitempty"`
+	CacheCookie           *string `json:"cache_cookie,omitempty"`
+	CacheArgs             *bool   `json:"cache_args,omitempty"`
+	CacheArg              *string `json:"cache_arg,omitempty"`
+}
+
+type CachingPurgeRequest struct {
+	Purge     string   `json:"purge"`
+	PurgeURLs []string `json:"purge_urls,omitempty"`
+	PurgeTags []string `json:"purge_tags,omitempty"`
 }
 
 type CacheSettingsResponse struct {

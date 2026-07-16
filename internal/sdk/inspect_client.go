@@ -13,14 +13,6 @@ func (c *Client) GetFirewallSettings(ctx context.Context, domain string) (*Firew
 	return &resp.Data, nil
 }
 
-func (c *Client) GetCacheSettings(ctx context.Context, domain string) (*CacheSettings, error) {
-	var resp CacheSettingsResponse
-	if err := c.get(ctx, "/caching/"+url.PathEscape(domain), nil, &resp); err != nil {
-		return nil, err
-	}
-	return &resp.Data, nil
-}
-
 func (c *Client) GetSslSettings(ctx context.Context, domain string) (*SslSettings, error) {
 	var resp SslSettingsResponse
 	if err := c.get(ctx, "/ssl/"+url.PathEscape(domain), nil, &resp); err != nil {

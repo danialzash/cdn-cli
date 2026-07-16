@@ -294,7 +294,33 @@ verge page-rules update example.com <rule-id> --enabled=false
 verge page-rules delete example.com <rule-id>
 ```
 
-### 9. Manage DNS records
+### 9. Cache settings
+
+Get caching settings:
+
+```bash
+verge cache example.com
+```
+
+Update caching settings (only pass flags you want to change):
+
+```bash
+verge cache update example.com --developer-mode
+verge cache update example.com --max-size 104857600 --status uri
+verge cache update example.com --max-age 1h --browser default
+verge cache update example.com --consistent-uptime --bypass-on-cookie
+```
+
+Purge CDN cache:
+
+```bash
+verge cache purge example.com
+verge cache purge example.com --purge all
+verge cache purge example.com --purge individual --purge-urls https://example.com/static/app.js
+verge cache purge example.com --purge individual --purge-urls https://a.example.com/x --purge-urls https://b.example.com/y
+```
+
+### 10. Manage DNS records
 
 List all records with full values:
 
@@ -342,7 +368,7 @@ verge dns verify example.com --workers 20
 verge dns verify example.com --record-id <record-id>
 ```
 
-### 10. Run smart check
+### 11. Run smart check
 
 ```bash
 verge troubleshoot smartcheck example.com
@@ -403,6 +429,10 @@ verge page-rules add <domain> --url <pattern> [--cache-level <level>] [--cache-m
 verge page-rules get <domain> <rule-id>
 verge page-rules update <domain> <rule-id> [--url <pattern>] [--enabled] [--seq <n>] [--cache-level <level>] [--cache-max-age <duration>]
 verge page-rules delete <domain> <rule-id> [--force]
+
+verge cache <domain>
+verge cache update <domain> [--developer-mode] [--consistent-uptime] [--max-size <bytes>] [--status off|uri|query_string] [--max-age <duration>] [--page-any <duration>] [--browser <duration>] [--scheme] [--bypass-on-cookie] [--cookie <names>] [--args] [--arg <names>]
+verge cache purge <domain> [--purge all|individual|tags] [--purge-urls <url>...] [--purge-tags <tag>...]
 
 verge dns list <domain>
 verge dns get <domain> <record-id>

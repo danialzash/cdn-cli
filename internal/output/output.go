@@ -144,6 +144,37 @@ func (p *Printer) PrintFirewallRule(rule *client.FirewallRule) error {
 	return nil
 }
 
+func (p *Printer) PrintCacheSettings(settings *client.CacheSettings) error {
+	if p.JSON {
+		return p.PrintJSON(settings)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("Cache Settings"))
+	table := p.newTable([]string{"FIELD", "VALUE"})
+	table.Append([]string{"Status", cacheStatusLabel(settings.Status)})
+	table.Append([]string{"Max Age", emptyDash(settings.MaxAge)})
+	table.Append([]string{"Developer Mode", boolLabel(settings.DeveloperMode)})
+	table.Append([]string{"Max Size", formatCacheSize(settings.MaxSize)})
+	table.Append([]string{"Consistent Uptime", boolLabel(settings.ConsistentUptime)})
+	if settings.PageAny != "" {
+		table.Append([]string{"Page Any", settings.PageAny})
+	}
+	if settings.Browser != "" {
+		table.Append([]string{"Browser", settings.Browser})
+	}
+	table.Append([]string{"Scheme", boolLabel(settings.Scheme)})
+	table.Append([]string{"Bypass on Cookie", boolLabel(settings.BypassOnCookie)})
+	if settings.Cookie != "" {
+		table.Append([]string{"Cookie", settings.Cookie})
+	}
+	table.Append([]string{"Query Args", boolLabel(settings.Args)})
+	if settings.Arg != "" {
+		table.Append([]string{"Query Arg", settings.Arg})
+	}
+	table.Render()
+	return nil
+}
+
 func (p *Printer) PrintPageRules(rules []client.PageRule) error {
 	if p.JSON {
 		return p.PrintJSON(rules)
@@ -552,6 +583,22 @@ func cacheStatusLabel(status string) string {
 		return mutedStyle.Render("off")
 	}
 	return okStyle.Render(status)
+}
+
+func formatCacheSize(bytes int64) string {
+	if bytes <= 0 {
+		return "-"
+	}
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 func loadBalancingLabel(count int) string {
