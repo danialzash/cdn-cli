@@ -26,7 +26,7 @@ func NewRootCmd() *cobra.Command {
 		Short: "VergeCloud CDN CLI",
 		Long: `verge is a command-line interface for the VergeCloud CDN API.
 
-Manage domains, DNS records, firewall rules, page rules, cache settings, acceleration, lists, SSL/TLS, WAF packages, and diagnostics
+Manage domains, DNS records, firewall rules, page rules, cache settings, acceleration, lists, SSL/TLS, reports, WAF packages, and diagnostics
 from your terminal. Run "man verge" for full documentation after installation.
 
 Configuration is stored in ~/.config/vergecloud/config.yaml.`,
@@ -50,6 +50,7 @@ Configuration is stored in ~/.config/vergecloud/config.yaml.`,
 		newAccelerationCmd(),
 		newListsCmd(),
 		newSslCmd(),
+		newReportsCmd(),
 		newVersionCmd(),
 	)
 

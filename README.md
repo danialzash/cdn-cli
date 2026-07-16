@@ -426,7 +426,49 @@ verge ssl orders list example.com --type origin
 verge ssl orders retry example.com
 ```
 
-### 13. Manage DNS records
+### 13. Reports
+
+List available report types:
+
+```bash
+verge reports list
+```
+
+Domain reports (with ASCII charts in the terminal):
+
+```bash
+verge reports traffic example.com --period 24h
+verge reports traffic-saved example.com --period 7d
+verge reports traffic-geo example.com --period 24h --filter-subdomain www
+verge reports visitors example.com --period 24h
+verge reports status example.com --period 24h
+verge reports status-summary example.com --period 7d
+verge reports response-time example.com --period 24h
+verge reports high-request-ips example.com --period 24h
+verge reports errors example.com --period 24h
+verge reports errors-chart example.com --period 24h
+verge reports dns-requests example.com --period 24h
+verge reports dns-geo example.com --period 24h
+verge reports attacks example.com --period 24h
+verge reports attacks-detail example.com --period 24h
+verge reports attacks-attackers example.com --period 24h
+verge reports attacks-geo example.com --period 24h
+verge reports attacks-uri example.com --period 24h
+verge reports transport-layer-proxy example.com <transport-layer-proxy-id> --period 24h
+```
+
+Aggregated and export reports:
+
+```bash
+verge reports aggregated details --domains example.com,example.org --period 24h --category-type pop
+verge reports aggregated charts --domains example.com,example.org --period 24h --report-type traffic
+verge reports aggregated filters --domains example.com,example.org
+verge reports domains-download --output domains-report.csv
+```
+
+Use `--json` for raw API responses. Use `--since` and `--until` for custom ISO8601 ranges.
+
+### 14. Manage DNS records
 
 List all records with full values:
 
@@ -474,7 +516,7 @@ verge dns verify example.com --workers 20
 verge dns verify example.com --record-id <record-id>
 ```
 
-### 14. Run smart check
+### 15. Run smart check
 
 ```bash
 verge troubleshoot smartcheck example.com
@@ -561,6 +603,14 @@ verge ssl certificates revoke <domain> <certificate-id> [--force]
 verge ssl issue <domain>
 verge ssl orders list <domain> [--type edge|origin]
 verge ssl orders retry <domain>
+
+verge reports list
+verge reports traffic <domain> [--period <period>] [--since <iso8601>] [--until <iso8601>] [--filter-subdomain <name>]
+verge reports traffic-saved|traffic-geo|visitors|response-time|status|status-summary|errors|errors-chart|dns-requests|dns-geo|attacks|attacks-detail|attacks-attackers|attacks-geo|attacks-uri <domain> [--period <period>]
+verge reports transport-layer-proxy <domain> <transport-layer-proxy-id> [--period <period>]
+verge reports error-details <domain> --error <message> [--period <period>]
+verge reports domains-download [--output <file.csv>]
+verge reports aggregated details|charts|filters --domains <domain,...> [--period <period>] [--category-type pop|asn]
 
 verge dns list <domain>
 verge dns get <domain> <record-id>
