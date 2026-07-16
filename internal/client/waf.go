@@ -92,13 +92,12 @@ func (c *Client) GetWafSettings(ctx context.Context, domain string) (*WafSetting
 }
 
 func (c *Client) UpdateWafSettings(ctx context.Context, domain string, input UpdateWafSettingsInput) (*WafSettings, error) {
-	settings, err := c.sdk.UpdateWafSettings(ctx, domain, sdk.UpdateWafSettingsRequest{
+	if err := c.sdk.UpdateWafSettings(ctx, domain, sdk.UpdateWafSettingsRequest{
 		Mode: input.Mode,
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, fmt.Errorf("update WAF settings for %q: %w", domain, err)
 	}
-	return mapWafSettings(settings), nil
+	return c.GetWafSettings(ctx, domain)
 }
 
 func (c *Client) ListDomainWafPackages(ctx context.Context, domain string) ([]WafPackage, error) {
