@@ -149,9 +149,10 @@ func (p *Printer) PrintPageRules(rules []client.PageRule) error {
 		return p.PrintJSON(rules)
 	}
 
-	table := p.newTable([]string{"SEQ", "URL", "ENABLED", "CACHE", "PROTECTED"})
+	table := p.newTable([]string{"ID", "SEQ", "URL", "ENABLED", "CACHE", "PROTECTED"})
 	for _, rule := range rules {
 		table.Append([]string{
+			rule.ID,
 			fmt.Sprintf("%d", rule.Seq),
 			truncate(rule.URL, 50),
 			boolLabel(rule.Enabled),
@@ -472,9 +473,9 @@ func (p *Printer) PrintDomainInspect(result *client.DomainInspect) error {
 
 	if len(result.PageRules.Rules) > 0 {
 		fmt.Fprintln(p.Out, titleStyle.Render(fmt.Sprintf("Page Rules (%d)", result.PageRules.Count)))
-		table := p.newTable([]string{"SEQ", "URL", "ENABLED", "CACHE"})
+		table := p.newTable([]string{"ID", "SEQ", "URL", "ENABLED", "CACHE"})
 		for _, rule := range result.PageRules.Rules {
-			table.Append([]string{fmt.Sprintf("%d", rule.Seq), truncate(rule.URL, 50), boolLabel(rule.Enabled), rule.CacheLevel})
+			table.Append([]string{rule.ID, fmt.Sprintf("%d", rule.Seq), truncate(rule.URL, 50), boolLabel(rule.Enabled), rule.CacheLevel})
 		}
 		table.Render()
 		fmt.Fprintln(p.Out)
