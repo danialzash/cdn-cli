@@ -52,29 +52,6 @@ type CacheSettingsResponse struct {
 	Data CacheSettings `json:"data"`
 }
 
-type SslSettings struct {
-	SSLStatus       bool          `json:"ssl_status"`
-	CertificateMode string        `json:"certificate_mode"`
-	TLSVersion      string        `json:"tls_version"`
-	HSTSStatus      bool          `json:"hsts_status"`
-	HTTPSRedirect   bool          `json:"https_redirect"`
-	QUICStatus      bool          `json:"quic_status"`
-	Certificates    []Certificate `json:"certificates"`
-}
-
-type Certificate struct {
-	ID          string   `json:"id"`
-	Type        string   `json:"type"`
-	Active      bool     `json:"active"`
-	DomainNames []string `json:"domain_names"`
-	Issuer      string   `json:"issuer"`
-	ExpiryDate  string   `json:"expiry_date"`
-}
-
-type SslSettingsResponse struct {
-	Data SslSettings `json:"data"`
-}
-
 type DdosSettings struct {
 	IsEnabled      bool   `json:"is_enabled"`
 	ProtectionMode string `json:"protection_mode"`

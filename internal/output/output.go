@@ -209,6 +209,141 @@ func (p *Printer) PrintImageResizeSettings(settings *client.ImageResizeSettings)
 	return nil
 }
 
+func (p *Printer) PrintSslSettings(settings *client.SslSettings) error {
+	if p.JSON {
+		return p.PrintJSON(settings)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("SSL Settings"))
+	table := p.newTable([]string{"FIELD", "VALUE"})
+	table.Append([]string{"SSL Enabled", boolLabel(settings.Enabled)})
+	table.Append([]string{"Certificate Mode", emptyDash(settings.CertificateMode)})
+	table.Append([]string{"TLS Version", emptyDash(settings.TLSVersion)})
+	table.Append([]string{"Fingerprint", boolLabel(settings.FingerprintEnabled)})
+	table.Append([]string{"HSTS", boolLabel(settings.HSTSEnabled)})
+	if settings.HSTSMaxAge != "" {
+		table.Append([]string{"HSTS Max Age", settings.HSTSMaxAge})
+	}
+	table.Append([]string{"HSTS Subdomain", boolLabel(settings.HSTSSubdomain)})
+	table.Append([]string{"HSTS Preload", boolLabel(settings.HSTSPreload)})
+	table.Append([]string{"HTTPS Redirect", boolLabel(settings.HTTPSRedirect)})
+	table.Append([]string{"Replace HTTP", boolLabel(settings.ReplaceHTTP)})
+	table.Append([]string{"QUIC", boolLabel(settings.QUICEnabled)})
+	table.Append([]string{"Verify SNI", boolLabel(settings.VerifySNI)})
+	if settings.CertificateKeyType != "" {
+		table.Append([]string{"Certificate Key Type", settings.CertificateKeyType})
+	}
+	table.Render()
+
+	if len(settings.Certificates) > 0 {
+		fmt.Fprintln(p.Out)
+		fmt.Fprintln(p.Out, titleStyle.Render(fmt.Sprintf("Certificates (%d)", len(settings.Certificates))))
+		_ = p.PrintCertificates(settings.Certificates)
+	}
+
+	if len(settings.Orders) > 0 {
+		fmt.Fprintln(p.Out)
+		fmt.Fprintln(p.Out, titleStyle.Render(fmt.Sprintf("Recent Orders (%d)", len(settings.Orders))))
+		_ = p.PrintCertificateOrders(settings.Orders)
+	}
+
+	return nil
+}
+
+func (p *Printer) PrintCertificates(certs []client.Certificate) error {
+	if p.JSON {
+		return p.PrintJSON(certs)
+	}
+
+	table := p.newTable([]string{"ID", "TYPE", "ACTIVE", "DOMAINS", "ISSUER", "EXPIRES"})
+	for _, cert := range certs {
+		table.Append([]string{
+			cert.ID,
+			cert.Type,
+			boolLabel(cert.Active),
+			truncate(strings.Join(cert.DomainNames, ", "), 40),
+			truncate(emptyDash(cert.Issuer), 20),
+			emptyDash(cert.ExpiryDate),
+		})
+	}
+	table.Render()
+	return nil
+}
+
+func (p *Printer) PrintCertificateDetail(cert *client.CertificateDetail) error {
+	if p.JSON {
+		return p.PrintJSON(cert)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("Certificate"))
+	table := p.newTable([]string{"FIELD", "VALUE"})
+	table.Append([]string{"ID", cert.ID})
+	table.Append([]string{"Type", cert.Type})
+	table.Append([]string{"Active", boolLabel(cert.Active)})
+	if cert.KeyType != "" {
+		table.Append([]string{"Key Type", cert.KeyType})
+	}
+	table.Append([]string{"Domains", strings.Join(cert.DomainNames, ", ")})
+	table.Append([]string{"Issuer", emptyDash(cert.Issuer)})
+	table.Append([]string{"Revoked", boolLabel(cert.IsRevoked)})
+	table.Append([]string{"Expires", emptyDash(cert.ExpiryDate)})
+	if cert.CreatedAt != "" {
+		table.Append([]string{"Created", cert.CreatedAt})
+	}
+	if cert.UpdatedAt != "" {
+		table.Append([]string{"Updated", cert.UpdatedAt})
+	}
+	if cert.CertificatePEM != "" {
+		table.Append([]string{"Certificate", fmt.Sprintf("(%d chars, base64)", len(cert.CertificatePEM))})
+	}
+	if cert.PrivateKeyPEM != "" {
+		table.Append([]string{"Private Key", fmt.Sprintf("(%d chars, base64)", len(cert.PrivateKeyPEM))})
+	}
+	table.Render()
+	return nil
+}
+
+func (p *Printer) PrintCertificateOrders(orders []client.CertificateOrder) error {
+	if p.JSON {
+		return p.PrintJSON(orders)
+	}
+
+	table := p.newTable([]string{"ID", "ORDER", "STATUS", "DOMAINS", "EXPIRES"})
+	for _, order := range orders {
+		table.Append([]string{
+			order.ID,
+			emptyDash(order.OrderID),
+			order.Status,
+			truncate(strings.Join(order.DomainNames, ", "), 40),
+			emptyDash(order.ExpiryDate),
+		})
+	}
+	table.Render()
+	return nil
+}
+
+func (p *Printer) PrintCertificateOrder(order *client.CertificateOrder) error {
+	if p.JSON {
+		return p.PrintJSON(order)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("Certificate Order"))
+	table := p.newTable([]string{"FIELD", "VALUE"})
+	table.Append([]string{"ID", order.ID})
+	table.Append([]string{"Order ID", emptyDash(order.OrderID)})
+	table.Append([]string{"Status", order.Status})
+	table.Append([]string{"Domains", strings.Join(order.DomainNames, ", ")})
+	table.Append([]string{"Expires", emptyDash(order.ExpiryDate)})
+	if order.CreatedAt != "" {
+		table.Append([]string{"Created", order.CreatedAt})
+	}
+	if order.UpdatedAt != "" {
+		table.Append([]string{"Updated", order.UpdatedAt})
+	}
+	table.Render()
+	return nil
+}
+
 func (p *Printer) PrintLists(lists []client.List) error {
 	if p.JSON {
 		return p.PrintJSON(lists)

@@ -389,7 +389,44 @@ verge lists delete <list-id> <item-id>
 verge lists delete <list-id> --force
 ```
 
-### 12. Manage DNS records
+### 12. SSL/TLS
+
+Get SSL settings:
+
+```bash
+verge ssl example.com
+```
+
+Update SSL settings:
+
+```bash
+verge ssl update example.com --enabled
+verge ssl update example.com --certificate managed
+verge ssl update example.com --tls-version TLSv1.2 --hsts --hsts-max-age 12mo
+verge ssl update example.com --https-redirect --quic
+```
+
+Manage certificates:
+
+```bash
+verge ssl certificates list example.com
+verge ssl certificates list example.com --type user,verge
+verge ssl certificates get example.com <certificate-id>
+verge ssl certificates upload example.com --certificate cert.pem --private-key key.pem
+verge ssl certificates delete example.com <certificate-id>
+verge ssl certificates revoke example.com <certificate-id>
+```
+
+Managed certificate orders:
+
+```bash
+verge ssl issue example.com
+verge ssl orders list example.com
+verge ssl orders list example.com --type origin
+verge ssl orders retry example.com
+```
+
+### 13. Manage DNS records
 
 List all records with full values:
 
@@ -437,7 +474,7 @@ verge dns verify example.com --workers 20
 verge dns verify example.com --record-id <record-id>
 ```
 
-### 13. Run smart check
+### 14. Run smart check
 
 ```bash
 verge troubleshoot smartcheck example.com
@@ -513,6 +550,17 @@ verge lists store --name <name> --type <type> [--description <text>] [--item <va
 verge lists get <list-id>
 verge lists add <list-id> [--item <value|desc>...] [--value <value> [--desc <text>]]
 verge lists delete <list-id> [item-id] [--force]
+
+verge ssl <domain>
+verge ssl update <domain> [--enabled] [--fingerprint] [--certificate <id|managed>] [--tls-version <version>] [--hsts] [--hsts-max-age <duration>] [--hsts-subdomain] [--hsts-preload] [--https-redirect] [--replace-http] [--quic] [--certificate-key-type rsa|ec]
+verge ssl certificates list <domain> [--type user|verge|origin]
+verge ssl certificates get <domain> <certificate-id> [--show-private-key]
+verge ssl certificates upload <domain> --certificate <file> --private-key <file>
+verge ssl certificates delete <domain> <certificate-id> [--force]
+verge ssl certificates revoke <domain> <certificate-id> [--force]
+verge ssl issue <domain>
+verge ssl orders list <domain> [--type edge|origin]
+verge ssl orders retry <domain>
 
 verge dns list <domain>
 verge dns get <domain> <record-id>
