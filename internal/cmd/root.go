@@ -83,6 +83,12 @@ GLOBAL FLAGS
   --api-key   Override API key for a single command
   --token     Override bearer token for a single command
 
+ENVIRONMENT
+
+  VERGECLOUD_API_KEY    API key (alternative to config file)
+  VERGECLOUD_TOKEN      Bearer token (alternative to config file)
+  VERGECLOUD_API_URL    API base URL override
+
 See also: man verge-reports, man verge-waf, man verge-ssl, man verge-dns`,
 	}
 
@@ -148,6 +154,9 @@ func loadRuntimeConfig() (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := config.ApplyEnv(cfg); err != nil {
+		return nil, err
+	}
 	if apiURL != "" {
 		cfg.APIURL = apiURL
 	}
@@ -168,7 +177,7 @@ func loadRuntimeConfig() (*config.Config, error) {
 
 func newAPIClient(cfg *config.Config) (*client.Client, error) {
 	if !cfg.IsAuthenticated() {
-		return nil, fmt.Errorf("not authenticated: run `verge auth login --api-key <key>` or `verge auth login --token <jwt>`")
+		return nil, fmt.Errorf("not authenticated: run `verge auth login`, set VERGECLOUD_API_KEY/VERGECLOUD_TOKEN, or see `verge auth api-key`")
 	}
 	return client.New(client.Options{
 		BaseURL: cfg.APIURL,

@@ -2,16 +2,20 @@
 
 A minimal, production-quality command-line interface for the [VergeCloud CDN API](https://api.vergecloud.dev/cdn/api-docs).
 
-This is **v0.2.0** — a small, extensible foundation focused on read-only operations and authentication. It is designed to grow with additional resources (DNS, SSL, cache, analytics, WAF rule management) without restructuring.
+This is **v0.3.0** — a production-quality CLI for managing VergeCloud CDN domains, DNS, SSL, cache, analytics, WAF, and more.
 
 ## Features
 
-- API key or bearer token authentication with local config storage
+- One-line install from GitHub Releases (Linux / macOS) with checksum verification
+- Self-update: `verge update` checks GitHub and replaces the binary in place
+- API key or bearer token authentication (config file, environment variables, or flags)
+- Built-in help for creating API keys at [panel.vergecloud.dev](https://panel.vergecloud.dev)
 - Domain listing and details
-- DNS record listing, creation, and live DNS verification
-- WAF package catalog and domain-specific packages
-- Firewall rule listing (read-only)
-- Smart Check troubleshooting with human-friendly output
+- DNS record management and live DNS verification
+- WAF package catalog and domain mode updates
+- Firewall, page rules, cache, acceleration, lists, SSL/TLS
+- Analytics reports with terminal charts
+- Smart Check troubleshooting
 - Pretty tables (default), JSON output (`--json`), and verbose request logging (`--verbose`)
 
 ## Requirements
@@ -38,6 +42,23 @@ Install to a custom directory:
 INSTALL_DIR=~/bin curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
 ```
 
+Pin a specific release:
+
+```bash
+VERSION=v0.3.0 curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
+```
+
+The install script verifies SHA256 checksums and installs man pages when available.
+
+### Getting started
+
+```bash
+verge getting-started    # install, update, auth, and first commands
+verge auth api-key       # how to create an API key in the panel
+```
+
+Create an API key at [panel.vergecloud.dev](https://panel.vergecloud.dev) → **Organization** → **API Keys**.
+
 Then authenticate with either method:
 
 ```bash
@@ -47,6 +68,22 @@ verge auth login --api-key <your-api-key>
 # Bearer token (Authorization: Bearer header)
 verge auth login --token <your-jwt>
 ```
+
+Or use environment variables (no config file required):
+
+```bash
+export VERGECLOUD_API_KEY="vc_your_api_key_here"
+verge domains list
+```
+
+### Updating
+
+```bash
+verge version --check    # check for a newer release
+verge update             # download, verify, and install latest
+```
+
+Re-running the install script also works and verifies checksums.
 
 ### Manual download
 
@@ -103,8 +140,8 @@ Ensure `~/bin` is on your `PATH` (for example, `export PATH="$HOME/bin:$PATH"` i
 1. Commit your changes and push to `main`.
 2. Tag a version:
    ```bash
-   git tag v0.2.0
-   git push origin v0.2.0
+   git tag v0.3.0
+   git push origin v0.3.0
    ```
 3. GitHub Actions runs GoReleaser and publishes binaries to [GitHub Releases](https://github.com/danialzash/cdn-cli/releases).
 
@@ -208,6 +245,13 @@ man verge
 
 ## Quick start
 
+### 0. New here?
+
+```bash
+verge getting-started
+verge auth api-key
+```
+
 ### 1. Authenticate
 
 Use an API key or bearer token (not both):
@@ -218,7 +262,15 @@ verge auth login --api-key <your-api-key>
 verge auth login --token <your-jwt>
 ```
 
-Credentials are stored at `~/.config/vergecloud/config.yaml` with `0600` permissions.
+Or export credentials for the current shell (useful in CI):
+
+```bash
+export VERGECLOUD_API_KEY="vc_your_api_key_here"
+# or
+export VERGECLOUD_TOKEN="eyJ..."
+```
+
+Credentials from `verge auth login` are stored at `~/.config/vergecloud/config.yaml` with `0600` permissions.
 
 ### 2. Verify authentication
 
@@ -532,7 +584,11 @@ verge troubleshoot smartcheck example.com
 | `--api-key` | Override stored API key for a single command |
 | `--token` | Override stored bearer token for a single command |
 
+Credential precedence (highest wins): **flags** → **environment variables** → **config file**.
+
 ## Configuration
+
+### Config file
 
 Example config (`~/.config/vergecloud/config.yaml`):
 
@@ -552,13 +608,42 @@ api_url: "https://api.vergecloud.dev/cdn"
 
 See [examples/config.yaml](examples/config.yaml).
 
+### Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `VERGECLOUD_API_KEY` | API key (`X-API-Key` header) |
+| `VERGECLOUD_TOKEN` | Bearer JWT (`Authorization: Bearer` header) |
+| `VERGECLOUD_API_URL` | API base URL (default: `https://api.vergecloud.dev/cdn`) |
+
+Set only one of `VERGECLOUD_API_KEY` or `VERGECLOUD_TOKEN`.
+
+```bash
+export VERGECLOUD_API_KEY="vc_your_api_key_here"
+verge auth status
+verge domains list
+```
+
+### API keys from the panel
+
+```bash
+verge auth api-key
+```
+
+Or manually: sign in at [panel.vergecloud.dev](https://panel.vergecloud.dev) → **Organization** → **API Keys** → create and copy the key (shown once).
+
 ## Commands
 
 ```
+verge getting-started
+verge auth api-key
 verge auth login --api-key <key>
 verge auth login --token <jwt>
 verge auth status
 verge auth logout
+
+verge update [--check]
+verge version [--check]
 
 verge domains list [--status active|inactive] [--sort-by name|status|updated_at] [--order asc|desc]
 verge domains get <domain-id-or-name>

@@ -1,5 +1,5 @@
 BINARY := verge
-VERSION := 0.2.0
+VERSION := 0.3.0
 LDFLAGS := -ldflags "-s -w -X github.com/vergecloud/cdn-cli/internal/version.Version=$(VERSION) -X github.com/vergecloud/cdn-cli/internal/version.UserAgent=vergecloud-cli/$(VERSION)"
 
 .PHONY: build test lint clean generate manpages install-man release-snapshot

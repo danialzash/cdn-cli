@@ -13,3 +13,8 @@ api_key: "vc_your_api_key_here"
 # bearer_token: "eyJhbGciOi..."
 
 api_url: "https://api.vergecloud.dev/cdn"
+
+# Or use environment variables instead of storing credentials:
+# VERGECLOUD_API_KEY=vc_...
+# VERGECLOUD_TOKEN=eyJ...
+# VERGECLOUD_API_URL=https://api.vergecloud.dev/cdn
