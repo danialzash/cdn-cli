@@ -209,6 +209,70 @@ func (p *Printer) PrintImageResizeSettings(settings *client.ImageResizeSettings)
 	return nil
 }
 
+func (p *Printer) PrintLists(lists []client.List) error {
+	if p.JSON {
+		return p.PrintJSON(lists)
+	}
+
+	table := p.newTable([]string{"ID", "NAME", "TYPE", "SCOPE", "ITEMS", "DESCRIPTION"})
+	for _, list := range lists {
+		table.Append([]string{
+			list.ID,
+			list.Name,
+			list.Type,
+			emptyDash(list.Scope),
+			fmt.Sprintf("%d", len(list.Items)),
+			truncate(emptyDash(list.Description), 40),
+		})
+	}
+	table.Render()
+	return nil
+}
+
+func (p *Printer) PrintList(list *client.List) error {
+	if p.JSON {
+		return p.PrintJSON(list)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("List"))
+	info := p.newTable([]string{"FIELD", "VALUE"})
+	info.Append([]string{"ID", list.ID})
+	info.Append([]string{"Name", list.Name})
+	info.Append([]string{"Type", list.Type})
+	info.Append([]string{"Scope", emptyDash(list.Scope)})
+	if list.Namespace != "" {
+		info.Append([]string{"Namespace", list.Namespace})
+	}
+	if list.Description != "" {
+		info.Append([]string{"Description", list.Description})
+	}
+	if list.CreatedAt != "" {
+		info.Append([]string{"Created", list.CreatedAt})
+	}
+	if list.UpdatedAt != "" {
+		info.Append([]string{"Updated", list.UpdatedAt})
+	}
+	info.Render()
+
+	if len(list.Items) == 0 {
+		fmt.Fprintln(p.Out, mutedStyle.Render("No items in this list."))
+		return nil
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("Items"))
+	items := p.newTable([]string{"ID", "VALUE", "DESCRIPTION", "CREATED"})
+	for _, item := range list.Items {
+		items.Append([]string{
+			item.ID,
+			truncate(item.Value, 50),
+			truncate(emptyDash(item.Desc), 30),
+			emptyDash(item.CreatedAt),
+		})
+	}
+	items.Render()
+	return nil
+}
+
 func (p *Printer) PrintPageRules(rules []client.PageRule) error {
 	if p.JSON {
 		return p.PrintJSON(rules)

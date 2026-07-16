@@ -350,7 +350,46 @@ verge acceleration image-resize update example.com --height-by height --width-by
 verge acceleration image-resize update example.com --mode short-side --mode-by mode --quality-by quality
 ```
 
-### 11. Manage DNS records
+### 11. Lists
+
+List available lists:
+
+```bash
+verge lists list
+verge lists list --scope private --type ip
+verge lists list --name blocked
+```
+
+Create a list:
+
+```bash
+verge lists store --name "Blocked IPs" --type ip --description "Office blocklist" \
+  --item "192.0.2.1|Office" --item "192.0.2.2|VPN"
+verge lists store --name "Bad JA3" --type bytes --item "abc123"
+```
+
+Get list details and values:
+
+```bash
+verge lists get <list-id>
+```
+
+Add items to a list:
+
+```bash
+verge lists add <list-id> --value 192.0.2.1 --desc "Office"
+verge lists add <list-id> --item "192.0.2.1|Office" --item "192.0.2.2|VPN"
+```
+
+Delete a list or item:
+
+```bash
+verge lists delete <list-id>
+verge lists delete <list-id> <item-id>
+verge lists delete <list-id> --force
+```
+
+### 12. Manage DNS records
 
 List all records with full values:
 
@@ -398,7 +437,7 @@ verge dns verify example.com --workers 20
 verge dns verify example.com --record-id <record-id>
 ```
 
-### 12. Run smart check
+### 13. Run smart check
 
 ```bash
 verge troubleshoot smartcheck example.com
@@ -468,6 +507,12 @@ verge acceleration <domain>
 verge acceleration update <domain> [--status on|off] [--extensions <ext>...]
 verge acceleration image-resize <domain>
 verge acceleration image-resize update <domain> [--status on|off] [--height-by <name>] [--width-by <name>] [--mode freely|short-side|long-side] [--mode-by <name>] [--quality-by <name>]
+
+verge lists list [--scope private|public] [--type ip|bytes|number] [--name <name>]
+verge lists store --name <name> --type <type> [--description <text>] [--item <value|desc>...] [--value <value> [--desc <text>]]
+verge lists get <list-id>
+verge lists add <list-id> [--item <value|desc>...] [--value <value> [--desc <text>]]
+verge lists delete <list-id> [item-id] [--force]
 
 verge dns list <domain>
 verge dns get <domain> <record-id>
