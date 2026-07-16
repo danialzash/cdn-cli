@@ -54,15 +54,6 @@ type DdosRule struct {
 	Description string `json:"description,omitempty"`
 }
 
-type PageRule struct {
-	ID          string `json:"id"`
-	Seq         int    `json:"seq"`
-	URL         string `json:"url"`
-	Enabled     bool   `json:"enabled"`
-	IsProtected bool   `json:"is_protected"`
-	CacheLevel  string `json:"cache_level,omitempty"`
-}
-
 type PageRulesInspect struct {
 	Count int        `json:"count"`
 	Rules []PageRule `json:"rules,omitempty"`
@@ -492,14 +483,7 @@ func (c *Client) listAllPageRules(ctx context.Context, domain string) ([]PageRul
 			return nil, err
 		}
 		for _, rule := range resp.Data {
-			all = append(all, PageRule{
-				ID:          rule.ID,
-				Seq:         rule.Seq,
-				URL:         rule.URL,
-				Enabled:     rule.Status,
-				IsProtected: rule.IsProtected,
-				CacheLevel:  rule.CacheLevel,
-			})
+			all = append(all, mapPageRuleSummary(rule))
 		}
 		if resp.Meta.LastPage == 0 || page >= resp.Meta.LastPage {
 			break

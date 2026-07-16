@@ -271,13 +271,27 @@ Domain-specific packages (with mode and status):
 verge waf packages --domain example.com
 ```
 
-### 7. List firewall rules
+### 7. Firewall rules
 
 ```bash
 verge firewall list example.com
+verge firewall update example.com <rule-id> --name "Block country" --filter 'ip.geoip.country in {"IR"}' --action deny
+verge firewall update example.com <rule-id> --enabled=false
+verge firewall delete example.com <rule-id>
+verge firewall delete example.com <rule-id> --force
 ```
 
-### 8. Manage DNS records
+### 8. Page rules
+
+```bash
+verge page-rules list example.com
+verge page-rules get example.com <rule-id>
+verge page-rules update example.com <rule-id> --url "/api/*" --cache-level uri --cache-max-age 1h
+verge page-rules update example.com <rule-id> --enabled=false
+verge page-rules delete example.com <rule-id>
+```
+
+### 9. Manage DNS records
 
 List all records with full values:
 
@@ -325,7 +339,7 @@ verge dns verify example.com --workers 20
 verge dns verify example.com --record-id <record-id>
 ```
 
-### 9. Run smart check
+### 10. Run smart check
 
 ```bash
 verge troubleshoot smartcheck example.com
@@ -375,7 +389,14 @@ verge domains inspect <domain>
 
 verge waf packages [--domain <domain>]
 
-verge firewall list <domain-id>
+verge firewall list <domain>
+verge firewall update <domain> <rule-id> [--name <name>] [--filter <expr>] [--action <action>] [--priority <n>] [--enabled] [--note <text>]
+verge firewall delete <domain> <rule-id> [--force]
+
+verge page-rules list <domain>
+verge page-rules get <domain> <rule-id>
+verge page-rules update <domain> <rule-id> [--url <pattern>] [--enabled] [--seq <n>] [--cache-level <level>] [--cache-max-age <duration>]
+verge page-rules delete <domain> <rule-id> [--force]
 
 verge dns list <domain>
 verge dns get <domain> <record-id>

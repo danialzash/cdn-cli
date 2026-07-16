@@ -93,6 +93,20 @@ type FirewallRulesResponse struct {
 	Links PaginatedLinks `json:"links"`
 }
 
+type FirewallRuleResponse struct {
+	Data    FirewallRule `json:"data"`
+	Message string       `json:"message,omitempty"`
+}
+
+type UpdateFirewallRuleRequest struct {
+	Name       *string `json:"name,omitempty"`
+	FilterExpr *string `json:"filter_expr,omitempty"`
+	Action     *string `json:"action,omitempty"`
+	Priority   *int    `json:"priority,omitempty"`
+	IsEnabled  *bool   `json:"is_enabled,omitempty"`
+	Note       *string `json:"note,omitempty"`
+}
+
 type WafPackage struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`

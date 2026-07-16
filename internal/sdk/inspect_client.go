@@ -3,7 +3,6 @@ package sdk
 import (
 	"context"
 	"net/url"
-	"strconv"
 )
 
 func (c *Client) GetFirewallSettings(ctx context.Context, domain string) (*FirewallSettings, error) {
@@ -42,15 +41,6 @@ func (c *Client) ListDdosRules(ctx context.Context, domain string, page, perPage
 	query := paginateQuery(page, perPage)
 	var resp DdosRulesResponse
 	if err := c.get(ctx, "/ddos/"+url.PathEscape(domain)+"/rules", query, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-func (c *Client) ListPageRules(ctx context.Context, domain string, page, perPage int) (*PageRulesResponse, error) {
-	query := paginateQuery(page, perPage)
-	var resp PageRulesResponse
-	if err := c.get(ctx, "/page-rules/"+url.PathEscape(domain), query, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -96,15 +86,4 @@ func (c *Client) GetAcceleration(ctx context.Context, domain string) (*Accelerat
 		return nil, err
 	}
 	return &resp.Data, nil
-}
-
-func paginateQuery(page, perPage int) url.Values {
-	query := url.Values{}
-	if page > 0 {
-		query.Set("page", strconv.Itoa(page))
-	}
-	if perPage > 0 {
-		query.Set("per_page", strconv.Itoa(perPage))
-	}
-	return query
 }

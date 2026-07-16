@@ -124,6 +124,70 @@ func (p *Printer) PrintFirewallRules(rules []client.FirewallRule) error {
 	return nil
 }
 
+func (p *Printer) PrintFirewallRule(rule *client.FirewallRule) error {
+	if p.JSON {
+		return p.PrintJSON(rule)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("Firewall Rule"))
+	table := p.newTable([]string{"FIELD", "VALUE"})
+	table.Append([]string{"ID", rule.ID})
+	table.Append([]string{"Name", rule.Name})
+	table.Append([]string{"Action", rule.Action})
+	table.Append([]string{"Priority", fmt.Sprintf("%d", rule.Priority)})
+	table.Append([]string{"Enabled", boolLabel(rule.Enabled)})
+	table.Append([]string{"Filter", rule.FilterExpr})
+	if rule.Note != "" {
+		table.Append([]string{"Note", rule.Note})
+	}
+	table.Render()
+	return nil
+}
+
+func (p *Printer) PrintPageRules(rules []client.PageRule) error {
+	if p.JSON {
+		return p.PrintJSON(rules)
+	}
+
+	table := p.newTable([]string{"SEQ", "URL", "ENABLED", "CACHE", "PROTECTED"})
+	for _, rule := range rules {
+		table.Append([]string{
+			fmt.Sprintf("%d", rule.Seq),
+			truncate(rule.URL, 50),
+			boolLabel(rule.Enabled),
+			rule.CacheLevel,
+			boolLabel(rule.IsProtected),
+		})
+	}
+	table.Render()
+	return nil
+}
+
+func (p *Printer) PrintPageRule(rule *client.PageRule) error {
+	if p.JSON {
+		if len(rule.Raw) > 0 {
+			return p.PrintRawJSON(rule.Raw)
+		}
+		return p.PrintJSON(rule)
+	}
+
+	fmt.Fprintln(p.Out, titleStyle.Render("Page Rule"))
+	table := p.newTable([]string{"FIELD", "VALUE"})
+	table.Append([]string{"ID", rule.ID})
+	table.Append([]string{"Seq", fmt.Sprintf("%d", rule.Seq)})
+	table.Append([]string{"URL", rule.URL})
+	table.Append([]string{"Enabled", boolLabel(rule.Enabled)})
+	table.Append([]string{"Protected", boolLabel(rule.IsProtected)})
+	if rule.CacheLevel != "" {
+		table.Append([]string{"Cache Level", rule.CacheLevel})
+	}
+	if rule.CacheMaxAge != "" {
+		table.Append([]string{"Cache Max Age", rule.CacheMaxAge})
+	}
+	table.Render()
+	return nil
+}
+
 func (p *Printer) PrintWafPackages(packages []client.WafPackage) error {
 	if p.JSON {
 		return p.PrintJSON(packages)
