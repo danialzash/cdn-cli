@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"net"
 	"strings"
 	"sync"
 )
@@ -16,6 +17,7 @@ type CnameCheckResult struct {
 	ExpectedTarget string
 	Matches        bool
 	Status         string
+	ResolveError   string
 }
 
 func (c *Client) GetDomainDetail(ctx context.Context, idOrName string) (*DomainDetail, error) {
@@ -47,11 +49,49 @@ func (c *Client) CheckCnameSetup(ctx context.Context, domain string) (*CnameChec
 	if d.CustomCname != "" {
 		expected = d.CustomCname
 	}
+	resolved, resolveErr := lookupPublicCNAME(ctx, domain)
+	matches := cnameTargetMatches(resolved, expected) || strings.EqualFold(d.Status, "active")
 	return &CnameCheckResult{
+		ResolvedTarget: resolved,
 		ExpectedTarget: expected,
 		Status:         d.Status,
-		Matches:        strings.EqualFold(d.Status, "active"),
+		Matches:        matches,
+		ResolveError:   resolveErrString(resolveErr),
 	}, nil
+}
+
+func lookupPublicCNAME(ctx context.Context, domain string) (string, error) {
+	resolver := &net.Resolver{PreferGo: true}
+	cname, err := resolver.LookupCNAME(ctx, domain)
+	if err != nil {
+		return "", err
+	}
+	return normalizeCnameHost(cname), nil
+}
+
+func normalizeCnameHost(host string) string {
+	host = strings.TrimSpace(host)
+	host = strings.TrimSuffix(host, ".")
+	return host
+}
+
+func cnameTargetMatches(resolved, expected string) bool {
+	resolved = normalizeCnameHost(resolved)
+	expected = normalizeCnameHost(expected)
+	if resolved == "" || expected == "" {
+		return false
+	}
+	if strings.EqualFold(resolved, expected) {
+		return true
+	}
+	return strings.HasSuffix(strings.ToLower(resolved), "."+strings.ToLower(expected))
+}
+
+func resolveErrString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func (c *Client) LoadCheckupInspect(ctx context.Context, domain string, sections map[string]bool) (*DomainInspect, error) {

@@ -135,15 +135,22 @@ func (c *ActivationCheck) checkCNAME(state *State) []Finding {
 	if state.CnameCheck != nil {
 		finding.Evidence["resolved_target"] = state.CnameCheck.ResolvedTarget
 		finding.Evidence["matches"] = state.CnameCheck.Matches
+		if state.CnameCheck.ResolveError != "" {
+			finding.Evidence["resolve_error"] = state.CnameCheck.ResolveError
+		}
 		if state.CnameCheck.Matches {
 			finding.Status = StatusPass
 			finding.Summary = "Public CNAME target matches the expected VergeCloud target."
 			return []Finding{finding}
 		}
 		finding.Status = StatusFail
+		resolved := state.CnameCheck.ResolvedTarget
+		if resolved == "" {
+			resolved = "(not resolved)"
+		}
 		finding.Summary = fmt.Sprintf(
-			"Public CNAME resolves to %q but VergeCloud expects %q.",
-			state.CnameCheck.ResolvedTarget,
+			"Public CNAME resolves to %s but VergeCloud expects %q.",
+			resolved,
 			expected,
 		)
 	} else if expected != "" {

@@ -129,7 +129,8 @@ func ProbeHTTP(ctx context.Context, client *http.Client, url string, hostHeader 
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 
 	redirects := make([]string, 0, 4)
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+	probeClient := *client
+	probeClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if len(via) >= maxRedirects {
 			result.TooManyRedirects = true
 			return fmt.Errorf("too many redirects")
@@ -144,7 +145,7 @@ func ProbeHTTP(ctx context.Context, client *http.Client, url string, hostHeader 
 		return nil
 	}
 
-	resp, err := client.Do(req)
+	resp, err := probeClient.Do(req)
 	result.TotalDuration = time.Since(start)
 	if !dnsStart.IsZero() && !dnsDone.IsZero() {
 		result.DNSDuration = dnsDone.Sub(dnsStart)

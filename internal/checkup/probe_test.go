@@ -68,6 +68,34 @@ func TestFilterSafeHeadersExcludesCookies(t *testing.T) {
 	}
 }
 
+func TestProbeHTTPIndependentRedirectState(t *testing.T) {
+	okSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer okSrv.Close()
+
+	loopSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/", http.StatusFound)
+	}))
+	defer loopSrv.Close()
+
+	client := NewProbeHTTPClient(5 * time.Second)
+	ctx := context.Background()
+
+	okResult := ProbeHTTP(ctx, client, okSrv.URL, "")
+	if okResult.Error != "" || okResult.RedirectLoop {
+		t.Fatalf("ok server probe failed: %+v", okResult)
+	}
+
+	loopResult := ProbeHTTP(ctx, client, loopSrv.URL, "")
+	if !loopResult.RedirectLoop && loopResult.Error == "" {
+		t.Fatalf("expected redirect loop on second probe, got %+v", loopResult)
+	}
+	if okResult.RedirectLoop {
+		t.Fatal("first probe redirect state was contaminated by second probe")
+	}
+}
+
 func TestCacheStatusFromHeaders(t *testing.T) {
 	if got := CacheStatusFromHeaders(map[string]string{"x-cache-status": "HIT"}); got != "hit" {
 		t.Fatalf("got %q", got)

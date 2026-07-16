@@ -174,8 +174,8 @@ func (c *SecurityCheck) securityHeadersFinding(state *State) []Finding {
 	return []Finding{{
 		ID:       "security.response-headers",
 		Category: string(CategorySecurity),
-		Status:   StatusPass,
-		Severity: SeverityInfo,
+		Status:   StatusWarn,
+		Severity: SeverityLow,
 		Title:    "Security response headers",
 		Summary:  fmt.Sprintf("Some optional application security headers were not observed: %s.", strings.Join(missing, ", ")),
 		Evidence: map[string]any{"missing": missing},
