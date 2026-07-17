@@ -3,6 +3,7 @@ package checkup
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -125,7 +126,7 @@ func NewProbeHTTPClient(timeout time.Duration) *http.Client {
 func NewOriginProbeHTTPClient(timeout time.Duration, dialAddress, tlsServerName string) *http.Client {
 	dialer := &net.Dialer{Timeout: timeout}
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
+		Proxy: nil,
 		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
 			return dialer.DialContext(ctx, network, dialAddress)
 		},
@@ -213,6 +214,14 @@ func ProbeHTTP(ctx context.Context, client *http.Client, rawURL string, hostHead
 
 	if err != nil {
 		if ctx.Err() != nil {
+			result.ProbeExecError = true
+		}
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			result.TimedOut = true
+			result.ProbeExecError = true
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
 			result.TimedOut = true
 			result.ProbeExecError = true
 		}
@@ -315,24 +324,14 @@ func hostsEquivalent(a, b string) bool {
 
 func ProbeTLS(ctx context.Context, address, serverName string, timeout time.Duration) *TLSProbeResult {
 	result := &TLSProbeResult{}
-	dialer := &net.Dialer{Timeout: timeout}
-	rawConn, err := dialer.DialContext(ctx, "tcp", address)
+	probeCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	dialer := &net.Dialer{}
+	rawConn, err := dialer.DialContext(probeCtx, "tcp", address)
 	if err != nil {
 		result.Error = err.Error()
-		if ctx.Err() != nil {
-			result.ProbeExecError = true
-		}
-		result.DiagnosticNote = "verified TLS handshake failed"
-		diag := probeTLSInsecure(ctx, address, serverName, timeout)
-		if diag.Connected {
-			result.DiagnosticNote = "diagnostic insecure handshake succeeded; certificate verification failed"
-			if diag.Issuer != "" {
-				result.Issuer = diag.Issuer
-			}
-			if !diag.NotAfter.IsZero() {
-				result.NotAfter = diag.NotAfter
-			}
-		}
+		markTLSProbeFailure(result, probeCtx, err)
 		return result
 	}
 
@@ -340,14 +339,12 @@ func ProbeTLS(ctx context.Context, address, serverName string, timeout time.Dura
 		ServerName:         serverName,
 		InsecureSkipVerify: false,
 	})
-	if err := tlsConn.HandshakeContext(ctx); err != nil {
+	if err := tlsConn.HandshakeContext(probeCtx); err != nil {
 		rawConn.Close()
 		result.Error = err.Error()
-		if ctx.Err() != nil {
-			result.ProbeExecError = true
-		}
+		markTLSProbeFailure(result, probeCtx, err)
 		result.DiagnosticNote = "verified TLS handshake failed"
-		diag := probeTLSInsecure(ctx, address, serverName, timeout)
+		diag := probeTLSInsecureDial(probeCtx, address, serverName)
 		if diag.Connected {
 			result.DiagnosticNote = "diagnostic insecure handshake succeeded; certificate verification failed"
 			if diag.Issuer != "" {
@@ -384,13 +381,31 @@ func ProbeTLS(ctx context.Context, address, serverName string, timeout time.Dura
 	return result
 }
 
-func probeTLSInsecure(ctx context.Context, address, serverName string, timeout time.Duration) *TLSProbeResult {
-	result := &TLSProbeResult{}
-	dialer := &net.Dialer{Timeout: timeout}
+func markTLSProbeFailure(result *TLSProbeResult, probeCtx context.Context, err error) {
+	var netErr net.Error
+	switch {
+	case errors.Is(probeCtx.Err(), context.DeadlineExceeded):
+		result.TimedOut = true
+		result.ProbeExecError = true
+	case errors.Is(probeCtx.Err(), context.Canceled):
+		result.ProbeExecError = true
+	case errors.As(err, &netErr) && netErr.Timeout():
+		result.TimedOut = true
+		result.ProbeExecError = true
+	}
+}
+
+func probeTLSInsecureDial(ctx context.Context, address, serverName string) *TLSProbeResult {
+	dialer := &net.Dialer{}
 	rawConn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
-		return result
+		return &TLSProbeResult{}
 	}
+	return probeTLSInsecure(ctx, rawConn, serverName)
+}
+
+func probeTLSInsecure(ctx context.Context, rawConn net.Conn, serverName string) *TLSProbeResult {
+	result := &TLSProbeResult{}
 	tlsConn := tls.Client(rawConn, &tls.Config{
 		ServerName:         serverName,
 		InsecureSkipVerify: true,

@@ -39,13 +39,33 @@ func (c *OriginCheck) connectivityFinding(state *State) []Finding {
 		Severity: SeverityHigh,
 	}
 	if state.OriginProbe == nil {
+		if len(state.OriginSchemeAttempts) > 0 {
+			status := StatusFail
+			for _, attempt := range state.OriginSchemeAttempts {
+				if attempt.ProbeExecError {
+					status = StatusError
+					break
+				}
+			}
+			f.Status = status
+			f.Summary = "Automatic origin scheme detection failed for both HTTPS and HTTP."
+			f.Evidence = map[string]any{"auto_scheme_attempts": state.OriginSchemeAttempts}
+			return []Finding{f}
+		}
 		f.Status = StatusError
 		f.Summary = "Origin probe did not run."
 		return []Finding{f}
 	}
 	if state.OriginProbe.Error != "" {
-		f.Status = StatusFail
+		if state.OriginProbe.ProbeExecError {
+			f.Status = StatusError
+		} else {
+			f.Status = StatusFail
+		}
 		f.Summary = fmt.Sprintf("Origin probe failed: %s", state.OriginProbe.Error)
+		if len(state.OriginSchemeAttempts) > 0 {
+			f.Evidence = map[string]any{"auto_scheme_attempts": state.OriginSchemeAttempts}
+		}
 		return []Finding{f}
 	}
 	healthPath := IsHealthPath(state.Options.Path)

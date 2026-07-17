@@ -64,7 +64,7 @@ func TestCloudProxyStrongEvidencePerHostname(t *testing.T) {
 	withApexOnly := &State{
 		Domain: DomainSummary{Name: apex, CnameTarget: "edge.cdn.net"},
 		HostEdgeProbes: map[string]*HTTPProbeResult{
-			apex: {AnalysisHeaders: map[string]string{"x-poweredby": "VergeCloud"}},
+			apex: {FinalURL: "https://example.com/", URL: "https://example.com/", AnalysisHeaders: map[string]string{"x-poweredby": "VergeCloud"}},
 		},
 	}
 	strong, source := cloudProxyStrongEvidenceForRecord(withApexOnly, dnsverify.Result{Name: "api", Actual: "1.2.3.4", Status: "ok"}, apiHost)
@@ -75,7 +75,7 @@ func TestCloudProxyStrongEvidencePerHostname(t *testing.T) {
 	withAPIProbe := &State{
 		Domain: DomainSummary{Name: apex, CnameTarget: "edge.cdn.net"},
 		HostEdgeProbes: map[string]*HTTPProbeResult{
-			apiHost: {AnalysisHeaders: map[string]string{"x-poweredby": "VergeCloud"}},
+			apiHost: {FinalURL: "https://api.example.com/", URL: "https://api.example.com/", AnalysisHeaders: map[string]string{"x-poweredby": "VergeCloud"}},
 		},
 	}
 	strong, source = cloudProxyStrongEvidenceForRecord(withAPIProbe, dnsverify.Result{Name: "api", Actual: "1.2.3.4", Status: "ok"}, apiHost)
@@ -110,8 +110,12 @@ func TestWWWResolutionOptional(t *testing.T) {
 func TestSecurityHeadersDetectedFromAnalysisMap(t *testing.T) {
 	check := &SecurityCheck{}
 	findings := check.securityHeadersFinding(&State{
+		Domain: DomainSummary{Name: "example.com"},
 		HTTPSProbe: &HTTPProbeResult{
-			Headers: map[string]string{"server": "nginx"},
+			StatusCode: 200,
+			FinalURL:   "https://example.com/",
+			URL:        "https://example.com/",
+			Headers:    map[string]string{"server": "nginx"},
 			AnalysisHeaders: map[string]string{
 				"content-security-policy": "default-src 'self'",
 				"x-content-type-options":  "nosniff",
@@ -238,6 +242,9 @@ func TestSmartCheckInspectFailureNoRetry(t *testing.T) {
 	if atomic.LoadInt32(&calls) != 0 {
 		t.Fatalf("expected 0 direct smartcheck calls, got %d", calls)
 	}
+	if state.SmartCheckLoadStatus != SmartCheckLoadFailed {
+		t.Fatalf("load status = %q", state.SmartCheckLoadStatus)
+	}
 	if len(state.ProbeErrors) != 1 {
 		t.Fatalf("probe errors = %+v", state.ProbeErrors)
 	}
@@ -263,6 +270,9 @@ func TestSmartCheckLoadedOnceFromInspect(t *testing.T) {
 	runner.prepareSmartCheck(context.Background(), state, "example.com")
 	if atomic.LoadInt32(&calls) != 0 {
 		t.Fatalf("expected 0 smartcheck API calls, got %d", calls)
+	}
+	if state.SmartCheckLoadStatus != SmartCheckLoaded {
+		t.Fatalf("load status = %q", state.SmartCheckLoadStatus)
 	}
 }
 

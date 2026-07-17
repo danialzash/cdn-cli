@@ -15,19 +15,20 @@ const (
 )
 
 type Options struct {
-	Only         []Category   `json:"only,omitempty"`
-	Skip         []Category   `json:"skip,omitempty"`
-	Path         string       `json:"path"`
-	Origin       string       `json:"origin,omitempty"`
-	OriginPort   int          `json:"origin_port,omitempty"`
-	OriginScheme string       `json:"origin_scheme"`
-	Timeout      DurationJSON `json:"timeout"`
-	ProbeTimeout DurationJSON `json:"probe_timeout"`
-	Resolvers    []string     `json:"resolvers,omitempty"`
-	Strict       bool         `json:"strict"`
-	Fix          bool         `json:"fix"`
-	Yes          bool         `json:"yes"`
-	DryRun       bool         `json:"dry_run"`
+	Only          []Category   `json:"only,omitempty"`
+	Skip          []Category   `json:"skip,omitempty"`
+	Path          string       `json:"path"`
+	Origin        string       `json:"origin,omitempty"`
+	OriginPort    int          `json:"origin_port,omitempty"`
+	OriginPortSet bool         `json:"origin_port_set,omitempty"`
+	OriginScheme  string       `json:"origin_scheme"`
+	Timeout       DurationJSON `json:"timeout"`
+	ProbeTimeout  DurationJSON `json:"probe_timeout"`
+	Resolvers     []string     `json:"resolvers,omitempty"`
+	Strict        bool         `json:"strict"`
+	Fix           bool         `json:"fix"`
+	Yes           bool         `json:"yes"`
+	DryRun        bool         `json:"dry_run"`
 }
 
 func ParseCategories(values []string) ([]Category, error) {
@@ -98,11 +99,14 @@ func (o Options) Validate() error {
 		}
 	}
 	if strings.TrimSpace(o.Origin) != "" {
-		if _, _, _, err := parseOriginHostPort(o.Origin, o.OriginPort); err != nil {
+		if _, _, _, err := parseOriginHostPort(o.Origin, o.OriginPort, o.OriginPortSet); err != nil {
 			return fmt.Errorf("invalid --origin: %w", err)
 		}
 	}
-	if o.OriginPort != 0 {
+	if o.OriginPortSet && strings.TrimSpace(o.Origin) == "" {
+		return fmt.Errorf("--origin-port requires --origin")
+	}
+	if o.OriginPortSet {
 		if err := validatePort(o.OriginPort); err != nil {
 			return fmt.Errorf("invalid --origin-port: %w", err)
 		}

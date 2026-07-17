@@ -79,10 +79,61 @@ func relatedHost(domain, host string) bool {
 	return false
 }
 
-func httpRedirectsToHTTPS(probe *HTTPProbeResult) bool {
+func probeReachedExpectedHost(probe *HTTPProbeResult, expectedDomain string) bool {
 	if probe == nil || probe.Error != "" {
 		return false
 	}
-	final := strings.ToLower(probe.FinalURL)
-	return strings.HasPrefix(final, "https://")
+
+	evidence := probe.RedirectEvidence
+
+	if len(evidence.UnexpectedHosts) > 0 {
+		return false
+	}
+
+	if evidence.DowngradeDetected ||
+		evidence.LoopDetected ||
+		evidence.TooManyRedirects {
+		return false
+	}
+
+	finalURL := probe.FinalURL
+	if finalURL == "" {
+		finalURL = probe.URL
+	}
+	finalHost := redirectHost(finalURL)
+	if finalHost == "" {
+		return false
+	}
+
+	return relatedHost(expectedDomain, finalHost)
+}
+
+func httpRedirectsToRelatedHTTPS(probe *HTTPProbeResult, expectedDomain string) bool {
+	if probe == nil || probe.Error != "" {
+		return false
+	}
+
+	evidence := probe.RedirectEvidence
+
+	if len(evidence.UnexpectedHosts) > 0 ||
+		evidence.DowngradeDetected ||
+		evidence.LoopDetected ||
+		evidence.TooManyRedirects {
+		return false
+	}
+
+	finalURL := probe.FinalURL
+	if finalURL == "" {
+		finalURL = probe.URL
+	}
+	if schemeOf(finalURL) != "https" {
+		return false
+	}
+
+	finalHost := redirectHost(finalURL)
+	if finalHost == "" {
+		return false
+	}
+
+	return relatedHost(expectedDomain, finalHost)
 }

@@ -13,14 +13,50 @@ func (c *SmartCheckCheck) Category() Category     { return CategorySmartCheck }
 func (c *SmartCheckCheck) Dependencies() []string { return []string{"domain.resolve"} }
 
 func (c *SmartCheckCheck) Run(_ context.Context, state *State) []Finding {
-	if state.SmartCheck == nil {
+	switch state.SmartCheckLoadStatus {
+	case SmartCheckLoadFailed:
+		summary := "Latest Smart Checker report could not be loaded."
+		if state.SmartCheckLoadError != "" {
+			summary = fmt.Sprintf("Latest Smart Checker report could not be loaded: %s", state.SmartCheckLoadError)
+		}
 		return []Finding{{
 			ID:       "smartcheck.latest",
 			Category: string(CategorySmartCheck),
 			Status:   StatusError,
 			Severity: SeverityMedium,
 			Title:    "Smart Checker",
-			Summary:  "Latest Smart Checker report could not be loaded.",
+			Summary:  summary,
+		}}
+	case SmartCheckNotFound:
+		return []Finding{{
+			ID:       "smartcheck.latest",
+			Category: string(CategorySmartCheck),
+			Status:   StatusSkip,
+			Severity: SeverityInfo,
+			Title:    "Smart Checker",
+			Summary:  "No Smart Checker report is currently available.",
+		}}
+	case SmartCheckNotRequested:
+		if state.SmartCheck == nil {
+			return []Finding{{
+				ID:       "smartcheck.latest",
+				Category: string(CategorySmartCheck),
+				Status:   StatusSkip,
+				Severity: SeverityInfo,
+				Title:    "Smart Checker",
+				Summary:  "No Smart Checker report is currently available.",
+			}}
+		}
+	}
+
+	if state.SmartCheck == nil {
+		return []Finding{{
+			ID:       "smartcheck.latest",
+			Category: string(CategorySmartCheck),
+			Status:   StatusSkip,
+			Severity: SeverityInfo,
+			Title:    "Smart Checker",
+			Summary:  "No Smart Checker report is currently available.",
 		}}
 	}
 

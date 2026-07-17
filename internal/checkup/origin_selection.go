@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -36,14 +37,14 @@ func (r *Runner) selectOrigin(ctx context.Context, state *State, customerDomain,
 		scheme = "auto"
 	}
 
-	host, embeddedPort, portProvided, err := parseOriginHostPort(opts.Origin, opts.OriginPort)
+	host, embeddedPort, portProvided, err := parseOriginHostPort(opts.Origin, opts.OriginPort, opts.OriginPortSet)
 	if err != nil {
 		state.AddProbeError("origin.parse", err.Error())
 		return OriginSelection{}
 	}
 
 	port := embeddedPort
-	if opts.OriginPort != 0 {
+	if opts.OriginPortSet {
 		port = opts.OriginPort
 		portProvided = true
 	}
@@ -76,7 +77,7 @@ func (r *Runner) selectOrigin(ctx context.Context, state *State, customerDomain,
 			if httpOK {
 				return OriginSelection{Scheme: "http", Address: httpAttempt.Address, Port: port, Attempts: []OriginSchemeAttempt{httpsAttempt, httpAttempt}}
 			}
-			return OriginSelection{Scheme: "https", Address: httpsAttempt.Address, Port: port, Attempts: []OriginSchemeAttempt{httpsAttempt, httpAttempt}}
+			return OriginSelection{Attempts: []OriginSchemeAttempt{httpsAttempt, httpAttempt}}
 		}
 		httpsAttempt, httpsOK := r.probeOriginScheme(ctx, timeout, "https", host, 443, path, customerDomain)
 		if httpsOK {
@@ -86,7 +87,7 @@ func (r *Runner) selectOrigin(ctx context.Context, state *State, customerDomain,
 		if httpOK {
 			return OriginSelection{Scheme: "http", Address: httpAttempt.Address, Port: 80, Attempts: []OriginSchemeAttempt{httpsAttempt, httpAttempt}}
 		}
-		return OriginSelection{Scheme: "https", Address: httpsAttempt.Address, Port: 443, Attempts: []OriginSchemeAttempt{httpsAttempt, httpAttempt}}
+		return OriginSelection{Attempts: []OriginSchemeAttempt{httpsAttempt, httpAttempt}}
 	}
 }
 
@@ -98,16 +99,30 @@ func (r *Runner) probeOriginScheme(ctx context.Context, timeout time.Duration, s
 	if probe.Error == "" {
 		return OriginSchemeAttempt{Scheme: scheme, Status: "success", Address: address}, true
 	}
-	return OriginSchemeAttempt{Scheme: scheme, Status: "failed", Error: probe.Error, Address: address}, false
+	return OriginSchemeAttempt{
+		Scheme:         scheme,
+		Status:         "failed",
+		Error:          probe.Error,
+		Address:        address,
+		ProbeExecError: probe.ProbeExecError,
+		TimedOut:       probe.TimedOut,
+	}, false
 }
 
-func defaultOriginHostHeader(address string) string {
-	host, _, err := net.SplitHostPort(address)
+func defaultOriginHostHeader(address, scheme string) string {
+	host, portStr, err := net.SplitHostPort(address)
 	if err != nil {
 		return address
 	}
 	if net.ParseIP(host) != nil {
 		return address
 	}
-	return host
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return address
+	}
+	if (scheme == "http" && port == 80) || (scheme == "https" && port == 443) {
+		return host
+	}
+	return address
 }

@@ -152,7 +152,13 @@ func (c *SecurityCheck) hstsFinding(domain string, state *State) []Finding {
 	}
 
 	header := ""
-	if state.HTTPSProbe != nil && state.HTTPSProbe.Error == "" {
+	httpsOK := state.HTTPSProbe != nil && state.HTTPSProbe.Error == "" && !state.HTTPSProbe.ProbeExecError &&
+		probeReachedExpectedHost(state.HTTPSProbe, domain)
+	if httpsOK {
+		httpStatus, _, _ := ClassifyHTTPStatus(state.HTTPSProbe.StatusCode, state.Options.Path, IsHealthPath(state.Options.Path))
+		httpsOK = httpStatus != StatusFail && httpStatus != StatusError
+	}
+	if httpsOK {
 		header = state.HTTPSProbe.Headers["strict-transport-security"]
 	}
 
@@ -166,31 +172,27 @@ func (c *SecurityCheck) hstsFinding(domain string, state *State) []Finding {
 		"header":      header,
 	}
 
-	httpsOK := state.HTTPSProbe != nil && state.HTTPSProbe.Error == "" && !state.HTTPSProbe.ProbeExecError
 	tlsOK := state.TLSProbe != nil && state.TLSProbe.Connected && state.TLSProbe.HostnameMatch && !state.TLSProbe.Expired
 
 	if !sslAPIAvailable {
+		if !httpsOK {
+			f.Status = StatusSkip
+			f.Summary = "HSTS cannot be meaningfully evaluated because HTTPS is unavailable."
+			return []Finding{f}
+		}
 		if header != "" {
 			f.Status = StatusPass
 			f.Summary = "Strict-Transport-Security header was observed on the public HTTPS response."
-		} else if httpsOK {
+		} else {
 			f.Status = StatusWarn
 			f.Summary = "No Strict-Transport-Security header was observed; SSL API comparison is unavailable."
-		} else {
-			f.Status = StatusSkip
-			f.Summary = "HSTS cannot be meaningfully evaluated because HTTPS is unavailable."
 		}
 		return []Finding{f}
 	}
 
 	if !httpsOK {
-		if header != "" {
-			f.Status = StatusPass
-			f.Summary = "Strict-Transport-Security header was observed on the public HTTPS response."
-		} else {
-			f.Status = StatusSkip
-			f.Summary = "HSTS cannot be meaningfully evaluated because HTTPS is unavailable."
-		}
+		f.Status = StatusSkip
+		f.Summary = "HSTS cannot be meaningfully evaluated because HTTPS is unavailable."
 		return []Finding{f}
 	}
 
@@ -234,6 +236,13 @@ func (c *SecurityCheck) hstsFinding(domain string, state *State) []Finding {
 
 func (c *SecurityCheck) securityHeadersFinding(state *State) []Finding {
 	if state.HTTPSProbe == nil || state.HTTPSProbe.Error != "" || state.HTTPSProbe.ProbeExecError {
+		return nil
+	}
+	if !probeReachedExpectedHost(state.HTTPSProbe, state.Domain.Name) {
+		return []Finding{unrelatedRedirectFinding("security.unrelated-redirect", string(CategorySecurity), state.Domain.Name, state.HTTPSProbe)}
+	}
+	httpStatus, _, _ := ClassifyHTTPStatus(state.HTTPSProbe.StatusCode, state.Options.Path, IsHealthPath(state.Options.Path))
+	if httpStatus == StatusFail || httpStatus == StatusError {
 		return nil
 	}
 	analysis := state.HTTPSProbe.AnalysisHeaders

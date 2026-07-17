@@ -39,6 +39,8 @@ type State struct {
 	NSCheck                  *client.NSCheckResult
 	CnameCheck               *CnameCheckResult
 	SmartCheck               *client.SmartCheck
+	SmartCheckLoadStatus     SmartCheckLoadStatus
+	SmartCheckLoadError      string
 
 	DNSResults []dnsverify.Result
 
@@ -63,11 +65,22 @@ type State struct {
 	mu sync.RWMutex
 }
 
+type SmartCheckLoadStatus string
+
+const (
+	SmartCheckNotRequested SmartCheckLoadStatus = "not_requested"
+	SmartCheckLoaded       SmartCheckLoadStatus = "loaded"
+	SmartCheckNotFound     SmartCheckLoadStatus = "not_found"
+	SmartCheckLoadFailed   SmartCheckLoadStatus = "failed"
+)
+
 type OriginSchemeAttempt struct {
-	Scheme  string `json:"scheme"`
-	Status  string `json:"status"`
-	Error   string `json:"error,omitempty"`
-	Address string `json:"address,omitempty"`
+	Scheme         string `json:"scheme"`
+	Status         string `json:"status"`
+	Error          string `json:"error,omitempty"`
+	Address        string `json:"address,omitempty"`
+	ProbeExecError bool   `json:"probe_exec_error,omitempty"`
+	TimedOut       bool   `json:"timed_out,omitempty"`
 }
 
 func (s *State) AddProbeError(probe, message string) {
@@ -123,6 +136,7 @@ type TLSProbeResult struct {
 	Error             string
 	DiagnosticNote    string
 	ProbeExecError    bool
+	TimedOut          bool
 }
 
 type OriginProbeResult struct {
@@ -134,6 +148,8 @@ type OriginProbeResult struct {
 	TotalDuration     time.Duration
 	Error             string
 	DefaultHostStatus int
+	ProbeExecError    bool
+	TimedOut          bool
 }
 
 type Check interface {

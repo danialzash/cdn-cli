@@ -53,6 +53,9 @@ func hostnameEdgeProbeStrong(state *State, hostname string) (bool, string) {
 	if probe == nil || probe.Error != "" {
 		return false, "none"
 	}
+	if !probeReachedExpectedHost(probe, state.Domain.Name) {
+		return false, "none"
+	}
 	if len(probe.RedirectEvidence.UnexpectedHosts) > 0 {
 		return false, "none"
 	}

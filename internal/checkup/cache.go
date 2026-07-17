@@ -98,6 +98,38 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 		return findings
 	}
 
+	path := state.Options.Path
+	healthPath := IsHealthPath(path)
+	if !probeReachedExpectedHost(state.HTTPSProbe, domain) {
+		findings = append(findings, unrelatedRedirectFinding("cache.unrelated-redirect", string(CategoryCache), domain, state.HTTPSProbe))
+		return findings
+	}
+	if state.SecondHTTPSProbe != nil && !probeReachedExpectedHost(state.SecondHTTPSProbe, domain) {
+		findings = append(findings, unrelatedRedirectFinding("cache.unrelated-redirect", string(CategoryCache), domain, state.SecondHTTPSProbe))
+		return findings
+	}
+
+	firstHTTPStatus, firstHTTPSeverity, firstHTTPSummary := ClassifyHTTPStatus(state.HTTPSProbe.StatusCode, path, healthPath)
+	secondHTTPStatus, secondHTTPSeverity, secondHTTPSummary := ClassifyHTTPStatus(state.SecondHTTPSProbe.StatusCode, path, healthPath)
+	if firstHTTPStatus == StatusFail || firstHTTPStatus == StatusError {
+		findings = append(findings, Finding{
+			ID: "cache.repeated-request", Category: string(CategoryCache),
+			Status: firstHTTPStatus, Severity: firstHTTPSeverity, Title: "Repeated request cache behavior",
+			Summary:  firstHTTPSummary,
+			Evidence: map[string]any{"first_status_code": state.HTTPSProbe.StatusCode},
+		})
+		return findings
+	}
+	if secondHTTPStatus == StatusFail || secondHTTPStatus == StatusError {
+		findings = append(findings, Finding{
+			ID: "cache.repeated-request", Category: string(CategoryCache),
+			Status: secondHTTPStatus, Severity: secondHTTPSeverity, Title: "Repeated request cache behavior",
+			Summary:  secondHTTPSummary,
+			Evidence: map[string]any{"second_status_code": state.SecondHTTPSProbe.StatusCode},
+		})
+		return findings
+	}
+
 	first := CacheStatusFromHeaders(state.HTTPSProbe.Headers)
 	second := CacheStatusFromHeaders(state.SecondHTTPSProbe.Headers)
 	f := Finding{
@@ -153,17 +185,21 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 }
 
 func cacheRepeatedProbeError(state *State, summary string, second *HTTPProbeResult) Finding {
+	status := StatusError
+	severity := SeverityMedium
 	evidence := map[string]any{}
 	if state.HTTPSProbe != nil {
 		evidence["first_probe_status"] = state.HTTPSProbe.StatusCode
 	}
 	if second != nil {
+		status = probeFailureStatus(second)
+		severity = probeFailureSeverity(second)
 		evidence["second_probe_error"] = second.Error
 		evidence["second_probe_timed_out"] = second.TimedOut
 	}
 	return Finding{
 		ID: "cache.repeated-request", Category: string(CategoryCache),
-		Status: StatusError, Severity: SeverityMedium,
+		Status: status, Severity: severity,
 		Title: "Repeated request cache behavior", Summary: summary,
 		Evidence: evidence,
 	}

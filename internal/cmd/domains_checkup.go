@@ -53,6 +53,9 @@ origin tests. Read-only by default; pass --fix to review and apply safe fixes.`,
 			opts.Path = checkup.NormalizePath(path)
 			opts.Origin = strings.TrimSpace(origin)
 			opts.OriginPort = originPort
+			if cmd.Flags().Changed("origin-port") {
+				opts.OriginPortSet = true
+			}
 			opts.OriginScheme = originScheme
 			opts.Timeout = checkup.DurationJSON(timeout)
 			opts.ProbeTimeout = checkup.DurationJSON(probeTimeout)
@@ -93,6 +96,7 @@ origin tests. Read-only by default; pass --fix to review and apply safe fixes.`,
 				}
 
 				applier := checkup.NewClientFixApplier(apiClient)
+				applier.ProbeTimeout = opts.ProbeTimeoutDuration()
 				if opts.Fix {
 					plans := checkup.CollectFixPlans(result.Report.Findings)
 					if len(plans) > 0 {

@@ -25,10 +25,15 @@ func assertNoRedirectFix(t *testing.T, findings []Finding) {
 
 func healthyHTTPSState() *State {
 	return &State{
-		Domain:     DomainSummary{Name: "example.com"},
-		Inspect:    &client.DomainInspect{SSL: client.SslInspect{HTTPSRedirect: false, Enabled: true}},
-		HTTPSProbe: &HTTPProbeResult{StatusCode: 200},
-		TLSProbe:   &TLSProbeResult{Connected: true, HostnameMatch: true},
+		Domain:  DomainSummary{Name: "example.com"},
+		Inspect: &client.DomainInspect{SSL: client.SslInspect{HTTPSRedirect: false, Enabled: true}},
+		HTTPProbe: &HTTPProbeResult{
+			FinalURL: "http://example.com/", URL: "http://example.com/", StatusCode: 200,
+		},
+		HTTPSProbe: &HTTPProbeResult{
+			StatusCode: 200, FinalURL: "https://example.com/", URL: "https://example.com/",
+		},
+		TLSProbe: &TLSProbeResult{Connected: true, HostnameMatch: true},
 	}
 }
 
@@ -272,6 +277,9 @@ func TestSmartCheckInspectNilNoDirectCall(t *testing.T) {
 	if atomic.LoadInt32(&calls) != 0 {
 		t.Fatalf("expected 0 direct calls, got %d", calls)
 	}
+	if state.SmartCheckLoadStatus != SmartCheckNotFound {
+		t.Fatalf("load status = %q", state.SmartCheckLoadStatus)
+	}
 }
 
 func TestSmartCheckNotInInspectDirectCallOnce(t *testing.T) {
@@ -313,10 +321,14 @@ func TestHSTSDecisionTable(t *testing.T) {
 		{
 			name: "api enabled header missing healthy tls",
 			state: &State{
-				Domain:     DomainSummary{Name: "example.com"},
-				Inspect:    &client.DomainInspect{SSL: client.SslInspect{HSTS: true, Enabled: true}},
-				HTTPSProbe: &HTTPProbeResult{StatusCode: 200},
-				TLSProbe:   &TLSProbeResult{Connected: true, HostnameMatch: true},
+				Domain:  DomainSummary{Name: "example.com"},
+				Inspect: &client.DomainInspect{SSL: client.SslInspect{HSTS: true, Enabled: true}},
+				HTTPSProbe: &HTTPProbeResult{
+					StatusCode: 200,
+					FinalURL:   "https://example.com/",
+					URL:        "https://example.com/",
+				},
+				TLSProbe: &TLSProbeResult{Connected: true, HostnameMatch: true},
 			},
 			status: StatusWarn,
 		},
@@ -327,6 +339,8 @@ func TestHSTSDecisionTable(t *testing.T) {
 				Inspect: &client.DomainInspect{SSL: client.SslInspect{HSTS: false, Enabled: true}},
 				HTTPSProbe: &HTTPProbeResult{
 					StatusCode: 200,
+					FinalURL:   "https://example.com/",
+					URL:        "https://example.com/",
 					Headers:    map[string]string{"strict-transport-security": "max-age=31536000"},
 				},
 				TLSProbe: &TLSProbeResult{Connected: true, HostnameMatch: true},

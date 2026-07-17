@@ -146,9 +146,18 @@ func (c *HTTPCheck) redirectToHTTPSFinding(state *State) []Finding {
 		}}
 	}
 
-	httpsOK := state.HTTPSProbe.StatusCode >= 200 && state.HTTPSProbe.StatusCode < 400
+	httpsOK := state.HTTPSProbe.Error == "" &&
+		probeReachedExpectedHost(state.HTTPSProbe, state.Domain.Name)
+	if httpsOK {
+		httpStatus, _, _ := ClassifyHTTPStatus(
+			state.HTTPSProbe.StatusCode,
+			state.Options.Path,
+			IsHealthPath(state.Options.Path),
+		)
+		httpsOK = httpStatus != StatusFail && httpStatus != StatusError
+	}
 	tlsOK := state.TLSProbe != nil && state.TLSProbe.Connected && state.TLSProbe.HostnameMatch && !state.TLSProbe.Expired
-	redirectObserved := httpRedirectsToHTTPS(state.HTTPProbe)
+	redirectObserved := httpRedirectsToRelatedHTTPS(state.HTTPProbe, state.Domain.Name)
 	sslRedirectEnabled := state.Inspect.SSL.HTTPSRedirect
 
 	f := Finding{

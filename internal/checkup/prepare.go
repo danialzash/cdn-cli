@@ -121,21 +121,36 @@ func (r *Runner) prepareNSActivation(ctx context.Context, state *State, domain s
 func (r *Runner) prepareSmartCheck(ctx context.Context, state *State, domain string) {
 	if state.InspectRequestedSections["smartcheck"] {
 		if state.Inspect != nil {
-			state.SmartCheck = state.Inspect.SmartCheck
 			if HasInspectSectionError(state.Inspect, "smart_check") {
+				state.SmartCheckLoadStatus = SmartCheckLoadFailed
 				for _, errItem := range InspectSectionErrors(state.Inspect, "smart_check") {
+					state.SmartCheckLoadError = errItem.Error
 					state.AddProbeError("smartcheck", errItem.Error)
 				}
+				return
 			}
+			if state.Inspect.SmartCheck != nil {
+				state.SmartCheck = state.Inspect.SmartCheck
+				state.SmartCheckLoadStatus = SmartCheckLoaded
+				return
+			}
+			state.SmartCheckLoadStatus = SmartCheckNotFound
 		}
 		return
 	}
 	sc, err := r.source.GetLatestSmartCheck(ctx, domain)
 	if err != nil {
+		state.SmartCheckLoadStatus = SmartCheckLoadFailed
+		state.SmartCheckLoadError = err.Error()
 		state.AddProbeError("smartcheck", err.Error())
 		return
 	}
+	if sc == nil {
+		state.SmartCheckLoadStatus = SmartCheckNotFound
+		return
+	}
 	state.SmartCheck = sc
+	state.SmartCheckLoadStatus = SmartCheckLoaded
 }
 
 func (r *Runner) prepareDNS(ctx context.Context, state *State, req Requirements, resolver *PublicDNSResolver, domain string) {
@@ -286,7 +301,7 @@ func (r *Runner) runOriginProbes(ctx context.Context, state *State) {
 	requestURL := fmt.Sprintf("%s://%s%s", scheme, address, path)
 	state.OriginProbe = mapOriginProbe(ProbeHTTP(ctx, client, requestURL, customerDomain), scheme, address, customerDomain)
 
-	defaultHost := defaultOriginHostHeader(address)
+	defaultHost := defaultOriginHostHeader(address, scheme)
 	state.OriginHostProbe = mapOriginProbe(ProbeHTTP(ctx, client, requestURL, defaultHost), scheme, address, defaultHost)
 }
 
@@ -295,12 +310,14 @@ func mapOriginProbe(result *HTTPProbeResult, scheme, address, hostHeader string)
 		return nil
 	}
 	return &OriginProbeResult{
-		Scheme:        scheme,
-		Address:       address,
-		StatusCode:    result.StatusCode,
-		Headers:       result.Headers,
-		HostHeader:    hostHeader,
-		TotalDuration: result.TotalDuration,
-		Error:         result.Error,
+		Scheme:         scheme,
+		Address:        address,
+		StatusCode:     result.StatusCode,
+		Headers:        result.Headers,
+		HostHeader:     hostHeader,
+		TotalDuration:  result.TotalDuration,
+		Error:          result.Error,
+		ProbeExecError: result.ProbeExecError,
+		TimedOut:       result.TimedOut,
 	}
 }

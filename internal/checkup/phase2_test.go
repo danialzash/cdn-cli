@@ -127,6 +127,9 @@ func TestSecuritySSLAPIFailureStillAnalyzesHeaders(t *testing.T) {
 			Errors: []client.InspectError{{Section: "ssl", Error: "timeout"}},
 		},
 		HTTPSProbe: &HTTPProbeResult{
+			StatusCode:      200,
+			FinalURL:        "https://example.com/",
+			URL:             "https://example.com/",
 			AnalysisHeaders: map[string]string{"x-frame-options": "DENY", "strict-transport-security": "max-age=31536000"},
 		},
 		TLSProbe: &TLSProbeResult{Connected: true, HostnameMatch: true},

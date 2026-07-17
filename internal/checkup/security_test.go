@@ -7,8 +7,12 @@ import (
 func TestSecurityHeadersMissingIsWarn(t *testing.T) {
 	check := &SecurityCheck{}
 	findings := check.securityHeadersFinding(&State{
+		Domain: DomainSummary{Name: "example.com"},
 		HTTPSProbe: &HTTPProbeResult{
-			Headers: map[string]string{"server": "nginx"},
+			StatusCode: 200,
+			FinalURL:   "https://example.com/",
+			URL:        "https://example.com/",
+			Headers:    map[string]string{"server": "nginx"},
 		},
 	})
 	if len(findings) != 1 {
@@ -22,7 +26,11 @@ func TestSecurityHeadersMissingIsWarn(t *testing.T) {
 func TestSecurityHeadersPresentIsPass(t *testing.T) {
 	check := &SecurityCheck{}
 	findings := check.securityHeadersFinding(&State{
+		Domain: DomainSummary{Name: "example.com"},
 		HTTPSProbe: &HTTPProbeResult{
+			StatusCode: 200,
+			FinalURL:   "https://example.com/",
+			URL:        "https://example.com/",
 			Headers: map[string]string{
 				"content-security-policy": "default-src 'self'",
 				"x-content-type-options":  "nosniff",

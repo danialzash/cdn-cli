@@ -22,6 +22,23 @@ func parsePort(raw string) (int, error) {
 	return port, nil
 }
 
+func validateOriginHostString(host string) error {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return fmt.Errorf("origin host is empty")
+	}
+	if strings.Contains(host, " ") {
+		return fmt.Errorf("invalid origin host %q", host)
+	}
+	if strings.ContainsAny(host, "/?#") {
+		return fmt.Errorf("invalid origin host %q", host)
+	}
+	if strings.Contains(host, "://") {
+		return fmt.Errorf("invalid origin host %q", host)
+	}
+	return nil
+}
+
 func normalizeOriginHost(host string) string {
 	host = strings.TrimSpace(host)
 	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
@@ -34,7 +51,7 @@ func joinOriginAddress(host string, port int) string {
 	return net.JoinHostPort(host, strconv.Itoa(port))
 }
 
-func parseOriginHostPort(origin string, explicitPort int) (host string, port int, portProvided bool, err error) {
+func parseOriginHostPort(origin string, explicitPort int, explicitPortSet bool) (host string, port int, portProvided bool, err error) {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
 		return "", 0, false, fmt.Errorf("origin is empty")
@@ -46,33 +63,45 @@ func parseOriginHostPort(origin string, explicitPort int) (host string, port int
 		}
 		bracketHost, rest, _ := strings.Cut(origin, "]")
 		host = strings.TrimPrefix(bracketHost, "[")
-		rest = strings.TrimPrefix(rest, ":")
-		embeddedPort := 0
-		if rest != "" {
-			embeddedPort, err = parsePort(rest)
+		switch {
+		case rest == "":
+		case strings.HasPrefix(rest, ":"):
+			portPart := rest[1:]
+			if portPart == "" {
+				return "", 0, false, fmt.Errorf("invalid origin address %q", origin)
+			}
+			var embeddedPort int
+			embeddedPort, err = parsePort(portPart)
 			if err != nil {
 				return "", 0, false, fmt.Errorf("invalid origin address %q", origin)
 			}
+			port = embeddedPort
+			portProvided = true
+		default:
+			return "", 0, false, fmt.Errorf("invalid origin address %q", origin)
 		}
 		if net.ParseIP(host) == nil {
 			return "", 0, false, fmt.Errorf("invalid origin address %q", origin)
 		}
 		host = normalizeOriginHost(host)
-		if explicitPort != 0 {
+		if err := validateOriginHostString(host); err != nil {
+			return "", 0, false, err
+		}
+		if explicitPortSet {
 			if err := validatePort(explicitPort); err != nil {
 				return "", 0, false, err
 			}
 			return host, explicitPort, true, nil
 		}
-		if embeddedPort != 0 {
-			return host, embeddedPort, true, nil
-		}
-		return host, 0, false, nil
+		return host, port, portProvided, nil
 	}
 
 	if h, p, splitErr := net.SplitHostPort(origin); splitErr == nil {
 		host = normalizeOriginHost(h)
-		if explicitPort != 0 {
+		if err := validateOriginHostString(host); err != nil {
+			return "", 0, false, err
+		}
+		if explicitPortSet {
 			if err := validatePort(explicitPort); err != nil {
 				return "", 0, false, err
 			}
@@ -92,7 +121,10 @@ func parseOriginHostPort(origin string, explicitPort int) (host string, port int
 	}
 
 	host = normalizeOriginHost(origin)
-	if explicitPort != 0 {
+	if err := validateOriginHostString(host); err != nil {
+		return "", 0, false, err
+	}
+	if explicitPortSet {
 		if err := validatePort(explicitPort); err != nil {
 			return "", 0, false, err
 		}

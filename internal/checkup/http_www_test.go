@@ -11,8 +11,8 @@ func TestHTTPSRedirectEnabledAndObservedPass(t *testing.T) {
 	findings := check.redirectToHTTPSFinding(&State{
 		Domain:     DomainSummary{Name: "example.com"},
 		Inspect:    &client.DomainInspect{SSL: client.SslInspect{HTTPSRedirect: true}},
-		HTTPProbe:  &HTTPProbeResult{FinalURL: "https://example.com/", StatusCode: 301},
-		HTTPSProbe: &HTTPProbeResult{StatusCode: 200},
+		HTTPProbe:  &HTTPProbeResult{FinalURL: "https://example.com/", StatusCode: 301, URL: "http://example.com/"},
+		HTTPSProbe: &HTTPProbeResult{StatusCode: 200, FinalURL: "https://example.com/", URL: "https://example.com/"},
 		TLSProbe:   &TLSProbeResult{Connected: true, HostnameMatch: true},
 	})
 	if len(findings) != 1 || findings[0].Status != StatusPass || findings[0].Fix != nil {
@@ -25,8 +25,8 @@ func TestHTTPSRedirectEnabledNotObservedWarnNoFix(t *testing.T) {
 	findings := check.redirectToHTTPSFinding(&State{
 		Domain:     DomainSummary{Name: "example.com"},
 		Inspect:    &client.DomainInspect{SSL: client.SslInspect{HTTPSRedirect: true}},
-		HTTPProbe:  &HTTPProbeResult{FinalURL: "http://example.com/", StatusCode: 200},
-		HTTPSProbe: &HTTPProbeResult{StatusCode: 200},
+		HTTPProbe:  &HTTPProbeResult{FinalURL: "http://example.com/", StatusCode: 200, URL: "http://example.com/"},
+		HTTPSProbe: &HTTPProbeResult{StatusCode: 200, FinalURL: "https://example.com/", URL: "https://example.com/"},
 		TLSProbe:   &TLSProbeResult{Connected: true, HostnameMatch: true},
 	})
 	if findings[0].Status != StatusWarn || findings[0].Fix != nil {
@@ -39,8 +39,8 @@ func TestHTTPSRedirectDisabledHealthyOffersFix(t *testing.T) {
 	findings := check.redirectToHTTPSFinding(&State{
 		Domain:     DomainSummary{Name: "example.com"},
 		Inspect:    &client.DomainInspect{SSL: client.SslInspect{HTTPSRedirect: false, Enabled: true}},
-		HTTPProbe:  &HTTPProbeResult{FinalURL: "http://example.com/", StatusCode: 200},
-		HTTPSProbe: &HTTPProbeResult{StatusCode: 200},
+		HTTPProbe:  &HTTPProbeResult{FinalURL: "http://example.com/", StatusCode: 200, URL: "http://example.com/"},
+		HTTPSProbe: &HTTPProbeResult{StatusCode: 200, FinalURL: "https://example.com/", URL: "https://example.com/"},
 		TLSProbe:   &TLSProbeResult{Connected: true, HostnameMatch: true},
 	})
 	if findings[0].Fix == nil || findings[0].Fix.ID != "ssl.https-redirect" {

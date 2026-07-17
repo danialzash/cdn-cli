@@ -7,32 +7,34 @@ import (
 
 func TestParseOriginHostPortTable(t *testing.T) {
 	tests := []struct {
-		name         string
-		origin       string
-		explicitPort int
-		wantHost     string
-		wantPort     int
-		wantProvided bool
-		wantErr      bool
+		name            string
+		origin          string
+		explicitPort    int
+		explicitPortSet bool
+		wantHost        string
+		wantPort        int
+		wantProvided    bool
+		wantErr         bool
 	}{
-		{"ipv4 no port", "203.0.113.10", 0, "203.0.113.10", 0, false, false},
-		{"ipv4 with port", "203.0.113.10:8080", 0, "203.0.113.10", 8080, true, false},
-		{"hostname no port", "origin.example.com", 0, "origin.example.com", 0, false, false},
-		{"hostname with port", "origin.example.com:8443", 0, "origin.example.com", 8443, true, false},
-		{"bare ipv6", "2001:db8::1", 0, "2001:db8::1", 0, false, false},
-		{"bracketed ipv6", "[2001:db8::1]", 0, "2001:db8::1", 0, false, false},
-		{"bracketed ipv6 with port", "[2001:db8::1]:8443", 0, "2001:db8::1", 8443, true, false},
-		{"invalid string port", "example.com:not-a-port", 0, "", 0, false, true},
-		{"port suffix garbage", "example.com:80abc", 0, "", 0, false, true},
-		{"empty port", "example.com:", 0, "", 0, false, true},
-		{"missing closing bracket", "[2001:db8::1", 0, "", 0, false, true},
-		{"explicit port 0", "203.0.113.10", 0, "203.0.113.10", 0, false, false},
-		{"explicit port override", "example.com:8080", 8443, "example.com", 8443, true, false},
+		{"ipv4 no port", "203.0.113.10", 0, false, "203.0.113.10", 0, false, false},
+		{"ipv4 with port", "203.0.113.10:8080", 0, false, "203.0.113.10", 8080, true, false},
+		{"hostname no port", "origin.example.com", 0, false, "origin.example.com", 0, false, false},
+		{"hostname with port", "origin.example.com:8443", 0, false, "origin.example.com", 8443, true, false},
+		{"bare ipv6", "2001:db8::1", 0, false, "2001:db8::1", 0, false, false},
+		{"bracketed ipv6", "[2001:db8::1]", 0, false, "2001:db8::1", 0, false, false},
+		{"bracketed ipv6 with port", "[2001:db8::1]:8443", 0, false, "2001:db8::1", 8443, true, false},
+		{"invalid string port", "example.com:not-a-port", 0, false, "", 0, false, true},
+		{"port suffix garbage", "example.com:80abc", 0, false, "", 0, false, true},
+		{"empty port", "example.com:", 0, false, "", 0, false, true},
+		{"missing closing bracket", "[2001:db8::1", 0, false, "", 0, false, true},
+		{"bracket empty port", "[2001:db8::1]:", 0, false, "", 0, false, true},
+		{"hostname with path", "example.com/path", 0, false, "", 0, false, true},
+		{"explicit port override", "example.com:8080", 8443, true, "example.com", 8443, true, false},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			host, port, provided, err := parseOriginHostPort(tc.origin, tc.explicitPort)
+			host, port, provided, err := parseOriginHostPort(tc.origin, tc.explicitPort, tc.explicitPortSet)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error")
@@ -58,6 +60,7 @@ func TestValidatePortRejectsOutOfRange(t *testing.T) {
 	}
 	opts := DefaultOptions()
 	opts.Origin = "203.0.113.10"
+	opts.OriginPortSet = true
 	opts.OriginPort = 65536
 	if err := opts.Validate(); err == nil {
 		t.Fatal("expected origin-port validation error")
@@ -73,14 +76,14 @@ func TestJoinOriginAddressIPv6Normalized(t *testing.T) {
 }
 
 func TestParseOriginHostPortExplicitHTTPPort(t *testing.T) {
-	host, port, fromOrigin, err := parseOriginHostPort("203.0.113.10", 8080)
+	host, port, fromOrigin, err := parseOriginHostPort("203.0.113.10", 8080, true)
 	if err != nil || host != "203.0.113.10" || port != 8080 || !fromOrigin {
 		t.Fatalf("got %q %d %v err=%v", host, port, fromOrigin, err)
 	}
 }
 
 func TestParseOriginHostPortEmbeddedPort(t *testing.T) {
-	host, port, fromOrigin, err := parseOriginHostPort("203.0.113.10:8080", 0)
+	host, port, fromOrigin, err := parseOriginHostPort("203.0.113.10:8080", 0, false)
 	if err != nil || host != "203.0.113.10" || port != 8080 || !fromOrigin {
 		t.Fatalf("got %q %d %v err=%v", host, port, fromOrigin, err)
 	}

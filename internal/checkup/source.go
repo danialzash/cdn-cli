@@ -95,7 +95,7 @@ func (a *ClientFixApplier) VerifyFix(ctx context.Context, domain string, plan Fi
 			timeout = DefaultProbeTimeout
 		}
 		probe := ProbeHTTP(ctx, NewProbeHTTPClient(timeout), "http://"+domain+"/", "")
-		verification.BehaviorVerified = httpRedirectsToHTTPS(probe)
+		verification.BehaviorVerified = httpRedirectsToRelatedHTTPS(probe, domain)
 		if !verification.BehaviorVerified {
 			return verification, "HTTPS redirect is enabled in the API but live HTTP did not redirect to HTTPS", nil
 		}
