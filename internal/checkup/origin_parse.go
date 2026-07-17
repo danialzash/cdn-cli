@@ -5,6 +5,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 func validatePort(port int) error {
@@ -27,7 +28,7 @@ func validateOriginHostString(host string) error {
 	if host == "" {
 		return fmt.Errorf("origin host is empty")
 	}
-	if strings.Contains(host, " ") {
+	if strings.IndexFunc(host, unicode.IsSpace) >= 0 {
 		return fmt.Errorf("invalid origin host %q", host)
 	}
 	if strings.ContainsAny(host, "/?#") {
@@ -101,17 +102,17 @@ func parseOriginHostPort(origin string, explicitPort int, explicitPortSet bool) 
 		if err := validateOriginHostString(host); err != nil {
 			return "", 0, false, err
 		}
+		embeddedPort, err := parsePort(p)
+		if err != nil {
+			return "", 0, false, fmt.Errorf("invalid origin address %q", origin)
+		}
 		if explicitPortSet {
 			if err := validatePort(explicitPort); err != nil {
 				return "", 0, false, err
 			}
 			return host, explicitPort, true, nil
 		}
-		port, err = parsePort(p)
-		if err != nil {
-			return "", 0, false, fmt.Errorf("invalid origin address %q", origin)
-		}
-		return host, port, true, nil
+		return host, embeddedPort, true, nil
 	}
 
 	if strings.Count(origin, ":") > 0 {

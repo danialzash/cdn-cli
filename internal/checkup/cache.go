@@ -130,6 +130,16 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 		return findings
 	}
 
+	httpWarning := firstHTTPStatus == StatusWarn || secondHTTPStatus == StatusWarn
+	httpWarningSeverity := SeverityInfo
+	if firstHTTPStatus == StatusWarn {
+		httpWarningSeverity = firstHTTPSeverity
+	}
+	if secondHTTPStatus == StatusWarn &&
+		severityRank[secondHTTPSeverity] < severityRank[httpWarningSeverity] {
+		httpWarningSeverity = secondHTTPSeverity
+	}
+
 	first := CacheStatusFromHeaders(state.HTTPSProbe.Headers)
 	second := CacheStatusFromHeaders(state.SecondHTTPSProbe.Headers)
 	f := Finding{
@@ -138,13 +148,15 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 		Title:    "Repeated request cache behavior",
 		Severity: SeverityInfo,
 		Evidence: map[string]any{
-			"first_status":   first,
-			"second_status":  second,
-			"cache_control":  state.HTTPSProbe.Headers["cache-control"],
-			"age":            state.HTTPSProbe.Headers["age"],
-			"vary":           state.HTTPSProbe.Headers["vary"],
-			"first_headers":  state.HTTPSProbe.Headers,
-			"second_headers": state.SecondHTTPSProbe.Headers,
+			"first_status":       first,
+			"second_status":      second,
+			"first_status_code":  state.HTTPSProbe.StatusCode,
+			"second_status_code": state.SecondHTTPSProbe.StatusCode,
+			"cache_control":      state.HTTPSProbe.Headers["cache-control"],
+			"age":                state.HTTPSProbe.Headers["age"],
+			"vary":               state.HTTPSProbe.Headers["vary"],
+			"first_headers":      state.HTTPSProbe.Headers,
+			"second_headers":     state.SecondHTTPSProbe.Headers,
 		},
 	}
 	switch {
@@ -160,6 +172,14 @@ func (c *CacheCheck) Run(_ context.Context, state *State) []Finding {
 	default:
 		f.Status = StatusWarn
 		f.Summary = "Cache hit/miss behavior could not be determined from response headers."
+	}
+	if httpWarning && f.Status == StatusPass {
+		f.Status = StatusWarn
+		f.Severity = httpWarningSeverity
+		f.Summary = fmt.Sprintf(
+			"%s Cache behavior was observed, but one or more HTTP responses were not fully healthy.",
+			f.Summary,
+		)
 	}
 	findings = append(findings, f)
 

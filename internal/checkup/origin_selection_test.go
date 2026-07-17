@@ -30,6 +30,10 @@ func TestParseOriginHostPortTable(t *testing.T) {
 		{"bracket empty port", "[2001:db8::1]:", 0, false, "", 0, false, true},
 		{"hostname with path", "example.com/path", 0, false, "", 0, false, true},
 		{"explicit port override", "example.com:8080", 8443, true, "example.com", 8443, true, false},
+		{"invalid embedded port with override", "example.com:not-a-port", 8443, true, "", 0, false, true},
+		{"embedded port suffix with override", "example.com:80abc", 8443, true, "", 0, false, true},
+		{"empty embedded port with override", "example.com:", 8443, true, "", 0, false, true},
+		{"invalid bracket port with override", "[2001:db8::1]:garbage", 8443, true, "", 0, false, true},
 	}
 
 	for _, tc := range tests {
