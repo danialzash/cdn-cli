@@ -27,9 +27,9 @@ func newListsCmd() *cobra.Command {
 
 func newListsListCmd() *cobra.Command {
 	var (
-		scope string
+		scope    string
 		listType string
-		name  string
+		name     string
 	)
 
 	cmd := &cobra.Command{

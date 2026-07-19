@@ -1,11 +1,11 @@
 package sdk
 
 type FirewallSettings struct {
-	IsEnabled        bool   `json:"is_enabled"`
-	DefaultAction    string `json:"default_action"`
-	VerifySNI        bool   `json:"verify_sni"`
-	SkipGlobalFW     bool   `json:"skip_global_firewall"`
-	SkipGlobalWL     bool   `json:"skip_global_whitelist"`
+	IsEnabled     bool   `json:"is_enabled"`
+	DefaultAction string `json:"default_action"`
+	VerifySNI     bool   `json:"verify_sni"`
+	SkipGlobalFW  bool   `json:"skip_global_firewall"`
+	SkipGlobalWL  bool   `json:"skip_global_whitelist"`
 }
 
 type FirewallSettingsResponse struct {
@@ -13,18 +13,18 @@ type FirewallSettingsResponse struct {
 }
 
 type CacheSettings struct {
-	CacheStatus          string `json:"cache_status"`
-	CacheMaxAge          string `json:"cache_max_age"`
-	CacheDeveloperMode   bool   `json:"cache_developer_mode"`
-	CacheMaxSize         int64  `json:"cache_max_size"`
-	CacheConsistentUptime bool  `json:"cache_consistent_uptime"`
-	CachePageAny         string `json:"cache_page_any,omitempty"`
-	CacheBrowser         string `json:"cache_browser,omitempty"`
-	CacheScheme          bool   `json:"cache_scheme,omitempty"`
-	CacheBypassOnCookie  bool   `json:"cache_bypass_on_cookie,omitempty"`
-	CacheCookie          string `json:"cache_cookie,omitempty"`
-	CacheArgs            bool   `json:"cache_args,omitempty"`
-	CacheArg             string `json:"cache_arg,omitempty"`
+	CacheStatus           string `json:"cache_status"`
+	CacheMaxAge           string `json:"cache_max_age"`
+	CacheDeveloperMode    bool   `json:"cache_developer_mode"`
+	CacheMaxSize          int64  `json:"cache_max_size"`
+	CacheConsistentUptime bool   `json:"cache_consistent_uptime"`
+	CachePageAny          string `json:"cache_page_any,omitempty"`
+	CacheBrowser          string `json:"cache_browser,omitempty"`
+	CacheScheme           bool   `json:"cache_scheme,omitempty"`
+	CacheBypassOnCookie   bool   `json:"cache_bypass_on_cookie,omitempty"`
+	CacheCookie           string `json:"cache_cookie,omitempty"`
+	CacheArgs             bool   `json:"cache_args,omitempty"`
+	CacheArg              string `json:"cache_arg,omitempty"`
 }
 
 type UpdateCacheSettingsRequest struct {
@@ -64,12 +64,12 @@ type DdosSettingsResponse struct {
 }
 
 type DdosRule struct {
-	ID         string   `json:"id"`
-	URLPattern string   `json:"url_pattern"`
-	Action     string   `json:"action"`
-	IsEnabled  bool     `json:"is_enabled"`
-	Description string  `json:"description"`
-	Sources    []string `json:"sources"`
+	ID          string   `json:"id"`
+	URLPattern  string   `json:"url_pattern"`
+	Action      string   `json:"action"`
+	IsEnabled   bool     `json:"is_enabled"`
+	Description string   `json:"description"`
+	Sources     []string `json:"sources"`
 }
 
 type DdosRulesResponse struct {
@@ -94,10 +94,10 @@ type PageRulesResponse struct {
 }
 
 type LoadBalancerSetting struct {
-	Method   string `json:"method"`
-	Protocol string `json:"protocol"`
-	Keepalive string `json:"keepalive"`
-	GRPCStatus bool  `json:"grpc_status"`
+	Method     string `json:"method"`
+	Protocol   string `json:"protocol"`
+	Keepalive  string `json:"keepalive"`
+	GRPCStatus bool   `json:"grpc_status"`
 }
 
 type LoadBalancerSettingsResponse struct {
@@ -114,12 +114,12 @@ type LoadBalancer struct {
 }
 
 type LoadBalancerAPI struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
 	Description string `json:"description"`
-	Status bool   `json:"status"`
-	Method string `json:"method"`
-	Pools  []struct {
+	Status      bool   `json:"status"`
+	Method      string `json:"method"`
+	Pools       []struct {
 		ID string `json:"id"`
 	} `json:"pools"`
 }
@@ -140,13 +140,13 @@ type RateLimitSettingsResponse struct {
 }
 
 type RateLimitRule struct {
-	ID          string `json:"id"`
-	URLPattern  string `json:"url_pattern"`
-	Action      string `json:"action"`
-	IsEnabled   bool   `json:"is_enabled"`
-	Rate        int    `json:"rate"`
-	TimeDuration int   `json:"time_duration"`
-	Description string `json:"description"`
+	ID           string `json:"id"`
+	URLPattern   string `json:"url_pattern"`
+	Action       string `json:"action"`
+	IsEnabled    bool   `json:"is_enabled"`
+	Rate         int    `json:"rate"`
+	TimeDuration int    `json:"time_duration"`
+	Description  string `json:"description"`
 }
 
 type RateLimitRulesResponse struct {

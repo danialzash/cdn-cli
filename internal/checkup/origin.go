@@ -1,0 +1,209 @@
+package checkup
+
+import (
+	"context"
+	"fmt"
+)
+
+type OriginCheck struct{}
+
+func (c *OriginCheck) ID() string             { return "origin" }
+func (c *OriginCheck) Category() Category     { return CategoryOrigin }
+func (c *OriginCheck) Dependencies() []string { return []string{"http"} }
+
+func (c *OriginCheck) Run(_ context.Context, state *State) []Finding {
+	if state.Options.Origin == "" {
+		return []Finding{{
+			ID:       "origin.connectivity",
+			Category: string(CategoryOrigin),
+			Status:   StatusSkip,
+			Severity: SeverityInfo,
+			Title:    "Origin connectivity",
+			Summary:  "Origin checks skipped because --origin was not supplied.",
+		}}
+	}
+
+	var findings []Finding
+	findings = append(findings, c.connectivityFinding(state)...)
+	findings = append(findings, c.hostHeaderFinding(state)...)
+	findings = append(findings, c.edgeComparisonFinding(state)...)
+
+	return findings
+}
+
+func (c *OriginCheck) connectivityFinding(state *State) []Finding {
+	f := Finding{
+		ID:       "origin.connectivity",
+		Category: string(CategoryOrigin),
+		Title:    "Origin connectivity",
+		Severity: SeverityHigh,
+	}
+	if state.OriginProbe == nil {
+		if len(state.OriginSchemeAttempts) > 0 {
+			status := StatusFail
+			for _, attempt := range state.OriginSchemeAttempts {
+				if attempt.ProbeExecError {
+					status = StatusError
+					break
+				}
+			}
+			f.Status = status
+			f.Summary = "Automatic origin scheme detection failed for both HTTPS and HTTP."
+			f.Evidence = map[string]any{"auto_scheme_attempts": state.OriginSchemeAttempts}
+			return []Finding{f}
+		}
+		f.Status = StatusError
+		f.Summary = "Origin probe did not run."
+		return []Finding{f}
+	}
+	if state.OriginProbe.Error != "" {
+		if state.OriginProbe.ProbeExecError {
+			f.Status = StatusError
+		} else {
+			f.Status = StatusFail
+		}
+		f.Summary = fmt.Sprintf("Origin probe failed: %s", state.OriginProbe.Error)
+		if len(state.OriginSchemeAttempts) > 0 {
+			f.Evidence = map[string]any{"auto_scheme_attempts": state.OriginSchemeAttempts}
+		}
+		return []Finding{f}
+	}
+	healthPath := IsHealthPath(state.Options.Path)
+	status, severity, summary := ClassifyHTTPStatus(state.OriginProbe.StatusCode, state.Options.Path, healthPath)
+	f.Status = status
+	f.Severity = severity
+	scheme := state.OriginProbe.Scheme
+	if scheme == "" && state.OriginSelection.Scheme != "" {
+		scheme = state.OriginSelection.Scheme
+	}
+	sniNote := ""
+	if scheme == "https" {
+		sniNote = fmt.Sprintf(" (TLS SNI: %s)", state.Domain.Name)
+	}
+	f.Summary = fmt.Sprintf(
+		"%s Origin returned HTTP %d in %s with Host: %s%s.",
+		summary,
+		state.OriginProbe.StatusCode,
+		state.OriginProbe.TotalDuration.Round(1),
+		state.OriginProbe.HostHeader,
+		sniNote,
+	)
+	f.Evidence = map[string]any{
+		"address":          state.OriginProbe.Address,
+		"status_code":      state.OriginProbe.StatusCode,
+		"host_header":      state.OriginProbe.HostHeader,
+		"selected_scheme":  scheme,
+		"selected_address": state.OriginSelection.Address,
+		"selected_port":    state.OriginSelection.Port,
+	}
+	if len(state.OriginSchemeAttempts) > 0 {
+		f.Evidence["auto_scheme_attempts"] = state.OriginSchemeAttempts
+	}
+	if scheme == "https" {
+		f.Evidence["tls_sni"] = state.Domain.Name
+	}
+	return []Finding{f}
+}
+
+func (c *OriginCheck) hostHeaderFinding(state *State) []Finding {
+	if state.OriginProbe == nil || state.OriginHostProbe == nil {
+		return nil
+	}
+	if state.OriginHostProbe.Error != "" || state.OriginProbe.Error != "" {
+		return nil
+	}
+	healthPath := IsHealthPath(state.Options.Path)
+	customerStatus, customerSeverity, _ := ClassifyHTTPStatus(state.OriginProbe.StatusCode, state.Options.Path, healthPath)
+	defaultStatus, _, _ := ClassifyHTTPStatus(state.OriginHostProbe.StatusCode, state.Options.Path, healthPath)
+
+	// Compare Host header routing using HTTP status classification.
+	if customerStatus != defaultStatus {
+		scheme := originScheme(state)
+		summary := fmt.Sprintf(
+			"Origin responds differently with customer Host %q (HTTP %d, %s) vs default Host %q (HTTP %d, %s).",
+			state.OriginProbe.HostHeader, state.OriginProbe.StatusCode, customerStatus,
+			state.OriginHostProbe.HostHeader, state.OriginHostProbe.StatusCode, defaultStatus,
+		)
+		evidence := map[string]any{
+			"customer_host": state.OriginProbe.HostHeader,
+			"default_host":  state.OriginHostProbe.HostHeader,
+			"customer_code": state.OriginProbe.StatusCode,
+			"default_code":  state.OriginHostProbe.StatusCode,
+		}
+		if scheme == "https" {
+			summary += fmt.Sprintf(" TLS SNI remained %q on both probes.", state.Domain.Name)
+			evidence["tls_sni"] = state.Domain.Name
+		}
+		return []Finding{{
+			ID:       "origin.host-header",
+			Category: string(CategoryOrigin),
+			Status:   StatusWarn,
+			Severity: SeverityMedium,
+			Title:    "Origin Host header routing",
+			Summary:  summary,
+			Evidence: evidence,
+		}}
+	}
+	if customerStatus == StatusFail {
+		return []Finding{{
+			ID: "origin.host-header", Category: string(CategoryOrigin),
+			Status: StatusFail, Severity: customerSeverity, Title: "Origin Host header routing",
+			Summary: fmt.Sprintf("Origin returns HTTP %d with customer Host header.", state.OriginProbe.StatusCode),
+		}}
+	}
+	scheme := originScheme(state)
+	passSummary := "Origin responds consistently with the customer Host header."
+	if scheme == "https" {
+		passSummary = "Origin responds consistently with the customer Host header; TLS SNI was unchanged."
+	}
+	return []Finding{{
+		ID:       "origin.host-header",
+		Category: string(CategoryOrigin),
+		Status:   StatusPass,
+		Severity: SeverityInfo,
+		Title:    "Origin Host header routing",
+		Summary:  passSummary,
+	}}
+}
+
+func (c *OriginCheck) edgeComparisonFinding(state *State) []Finding {
+	if state.OriginProbe == nil || state.HTTPSProbe == nil {
+		return nil
+	}
+	if state.OriginProbe.Error != "" && state.HTTPSProbe.Error == "" {
+		return []Finding{{
+			ID:       "origin.edge-mismatch",
+			Category: string(CategoryOrigin),
+			Status:   StatusWarn,
+			Severity: SeverityMedium,
+			Title:    "Edge vs origin",
+			Summary:  "Edge responds successfully while direct origin probe failed.",
+		}}
+	}
+	if state.OriginProbe.Error == "" && state.HTTPSProbe.Error != "" {
+		return []Finding{{
+			ID:       "origin.edge-mismatch",
+			Category: string(CategoryOrigin),
+			Status:   StatusWarn,
+			Severity: SeverityMedium,
+			Title:    "Edge vs origin",
+			Summary:  "Direct origin responds successfully while edge HTTPS failed.",
+		}}
+	}
+	if state.OriginProbe.StatusCode != 0 && state.HTTPSProbe.StatusCode != 0 &&
+		state.OriginProbe.StatusCode != state.HTTPSProbe.StatusCode {
+		return []Finding{{
+			ID:       "origin.status-mismatch",
+			Category: string(CategoryOrigin),
+			Status:   StatusWarn,
+			Severity: SeverityLow,
+			Title:    "Edge vs origin status",
+			Summary: fmt.Sprintf(
+				"Edge returned HTTP %d while origin returned HTTP %d.",
+				state.HTTPSProbe.StatusCode,
+				state.OriginProbe.StatusCode,
+			),
+		}}
+	}
+	return nil
+}

@@ -33,8 +33,8 @@ func newAuthAPIKeyHelpCmd() *cobra.Command {
 
 func newAuthLoginCmd() *cobra.Command {
 	var (
-		loginAPIKey    string
-		loginBearer    string
+		loginAPIKey string
+		loginBearer string
 	)
 
 	cmd := &cobra.Command{

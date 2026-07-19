@@ -166,6 +166,83 @@ verge domains list
 verge domains list --status active --sort-by name --order asc
 verge domains get example.com
 verge domains inspect example.com
+verge domains checkup example.com
+```
+
+**inspect** shows the current VergeCloud configuration (parallel API fetch).
+
+**smartcheck** shows the latest server-side VergeCloud Smart Checker result.
+
+**checkup** combines VergeCloud configuration with live DNS, HTTP, TLS, cache, CDN, and optional origin tests, then explains what is wrong and how to resolve it.
+
+```bash
+verge domains checkup example.com
+
+verge domains checkup example.com --only activation,dns,tls
+
+verge domains checkup example.com --path /healthz
+
+verge domains checkup example.com \
+  --origin 203.0.113.10 \
+  --origin-scheme https
+
+verge domains checkup example.com --strict
+
+verge domains checkup example.com --json
+
+verge domains checkup example.com --fix
+
+verge domains checkup example.com --fix --dry-run
+
+verge domains checkup example.com --fix --yes
+```
+
+Aliases: `verge domains doctor`, `verge domains diagnose`.
+
+#### Checkup categories
+
+`activation`, `dns`, `cdn`, `http`, `tls`, `origin`, `cache`, `security`, `configuration`, `smartcheck`
+
+Use `--only` or `--skip` to limit checks (not both together).
+
+#### Checkup exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Checks completed with no failures (warnings alone are OK unless `--strict`) |
+| 1 | CLI usage, authentication, API, or unexpected execution error |
+| 2 | One or more domain checks failed (or warnings with `--strict`) |
+| 3 | One or more required diagnostic probes could not run |
+| 4 | One or more approved fixes failed |
+
+Checkup is **read-only by default**. Pass `--fix` to review safe fixes; `--fix --yes` for automation; `--json --fix` requires `--yes` or `--dry-run`.
+
+#### CI example
+
+```bash
+verge domains checkup example.com \
+  --only activation,dns,http,tls \
+  --strict \
+  --json > checkup.json
+
+status=$?
+
+case "$status" in
+  0) echo "Domain is healthy" ;;
+  2) echo "Domain checks failed" ;;
+  3) echo "One or more probes could not run" ;;
+  *) echo "Checkup command failed" ;;
+esac
+
+exit "$status"
+```
+
+Boolean remediation commands use explicit values, for example:
+
+```bash
+verge dns update example.com <record-id> --cloud=false
+verge cache update example.com --developer-mode=false
+verge ssl update example.com --https-redirect=true
 ```
 
 `inspect` fetches DNS, firewall, WAF, SSL, cache, and other settings in parallel.
@@ -232,6 +309,8 @@ verge lists list
 ```bash
 verge smartcheck example.com
 ```
+
+Server-side Smart Checker only. For live DNS/HTTP/TLS diagnosis and remediation hints, use `verge domains checkup`.
 
 ## Shell completion
 

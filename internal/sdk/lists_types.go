@@ -38,10 +38,10 @@ type ListsResponse struct {
 }
 
 type CreateListRequest struct {
-	Name        string              `json:"name"`
-	Type        string              `json:"type"`
-	Description *string             `json:"description,omitempty"`
-	Values      []CreateListValue   `json:"values"`
+	Name        string            `json:"name"`
+	Type        string            `json:"type"`
+	Description *string           `json:"description,omitempty"`
+	Values      []CreateListValue `json:"values"`
 }
 
 type CreateListValue struct {

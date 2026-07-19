@@ -39,11 +39,11 @@ type WafInspect struct {
 }
 
 type DdosInspect struct {
-	Enabled        bool             `json:"enabled"`
-	ProtectionMode string           `json:"protection_mode,omitempty"`
-	CaptchaService string           `json:"captcha_service,omitempty"`
-	RuleCount      int              `json:"rule_count"`
-	Rules          []DdosRule       `json:"rules,omitempty"`
+	Enabled        bool       `json:"enabled"`
+	ProtectionMode string     `json:"protection_mode,omitempty"`
+	CaptchaService string     `json:"captcha_service,omitempty"`
+	RuleCount      int        `json:"rule_count"`
+	Rules          []DdosRule `json:"rules,omitempty"`
 }
 
 type DdosRule struct {
@@ -60,14 +60,14 @@ type PageRulesInspect struct {
 }
 
 type SslInspect struct {
-	Enabled         bool                `json:"enabled"`
-	CertificateMode string              `json:"certificate_mode,omitempty"`
-	TLSVersion      string              `json:"tls_version,omitempty"`
-	HSTS            bool                `json:"hsts"`
-	HTTPSRedirect   bool                `json:"https_redirect"`
-	QUIC            bool                `json:"quic"`
-	CertificateCount int                `json:"certificate_count"`
-	Certificates    []CertificateSummary `json:"certificates,omitempty"`
+	Enabled          bool                 `json:"enabled"`
+	CertificateMode  string               `json:"certificate_mode,omitempty"`
+	TLSVersion       string               `json:"tls_version,omitempty"`
+	HSTS             bool                 `json:"hsts"`
+	HTTPSRedirect    bool                 `json:"https_redirect"`
+	QUIC             bool                 `json:"quic"`
+	CertificateCount int                  `json:"certificate_count"`
+	Certificates     []CertificateSummary `json:"certificates,omitempty"`
 }
 
 type CertificateSummary struct {
@@ -80,11 +80,11 @@ type CertificateSummary struct {
 }
 
 type CacheInspect struct {
-	Status             string `json:"status,omitempty"`
-	MaxAge             string `json:"max_age,omitempty"`
-	DeveloperMode      bool   `json:"developer_mode"`
-	MaxSize            int64  `json:"max_size,omitempty"`
-	ConsistentUptime   bool   `json:"consistent_uptime"`
+	Status           string `json:"status,omitempty"`
+	MaxAge           string `json:"max_age,omitempty"`
+	DeveloperMode    bool   `json:"developer_mode"`
+	MaxSize          int64  `json:"max_size,omitempty"`
+	ConsistentUptime bool   `json:"consistent_uptime"`
 }
 
 type LoadBalancingInspect struct {
@@ -106,9 +106,9 @@ type LoadBalancerEntry struct {
 }
 
 type RateLimitInspect struct {
-	DdosDetection bool             `json:"ddos_detection"`
-	RuleCount     int              `json:"rule_count"`
-	Rules         []RateLimitRule  `json:"rules,omitempty"`
+	DdosDetection bool            `json:"ddos_detection"`
+	RuleCount     int             `json:"rule_count"`
+	Rules         []RateLimitRule `json:"rules,omitempty"`
 }
 
 type RateLimitRule struct {
@@ -132,19 +132,19 @@ type DNSInspect struct {
 }
 
 type DomainInspect struct {
-	Domain       DomainDetail          `json:"domain"`
-	DNS          DNSInspect            `json:"dns"`
-	Firewall     FirewallInspect       `json:"firewall"`
-	WAF          WafInspect            `json:"waf"`
-	DDoS         DdosInspect           `json:"ddos"`
-	PageRules    PageRulesInspect      `json:"page_rules"`
-	SSL          SslInspect            `json:"ssl"`
-	Cache        CacheInspect          `json:"cache"`
+	Domain        DomainDetail         `json:"domain"`
+	DNS           DNSInspect           `json:"dns"`
+	Firewall      FirewallInspect      `json:"firewall"`
+	WAF           WafInspect           `json:"waf"`
+	DDoS          DdosInspect          `json:"ddos"`
+	PageRules     PageRulesInspect     `json:"page_rules"`
+	SSL           SslInspect           `json:"ssl"`
+	Cache         CacheInspect         `json:"cache"`
 	LoadBalancing LoadBalancingInspect `json:"load_balancing"`
-	RateLimit    RateLimitInspect      `json:"rate_limit"`
-	Acceleration *AccelerationInspect  `json:"acceleration,omitempty"`
-	SmartCheck   *SmartCheck           `json:"smart_check,omitempty"`
-	Errors       []InspectError        `json:"errors,omitempty"`
+	RateLimit     RateLimitInspect     `json:"rate_limit"`
+	Acceleration  *AccelerationInspect `json:"acceleration,omitempty"`
+	SmartCheck    *SmartCheck          `json:"smart_check,omitempty"`
+	Errors        []InspectError       `json:"errors,omitempty"`
 }
 
 func (c *Client) InspectDomain(ctx context.Context, domain string) (*DomainInspect, error) {
@@ -223,50 +223,13 @@ func (c *Client) InspectDomain(ctx context.Context, domain string) (*DomainInspe
 		return nil
 	})
 
-	run("waf_settings", func() error {
-		settings, err := c.sdk.GetWafSettings(ctx, domain)
-		if err != nil {
-			return err
-		}
-		mode := settings.Mode
-		if mode == "" {
-			mode = "off"
-		}
-		mu.Lock()
-		result.WAF.Enabled = settings.IsEnabled
-		result.WAF.Mode = mode
-		mu.Unlock()
-		return nil
-	})
-
-	run("waf_packages", func() error {
-		resp, err := c.sdk.ListDomainWafPackages(ctx, domain)
+	run("waf", func() error {
+		waf, err := c.fetchWafInspect(ctx, domain)
 		if err != nil {
 			return err
 		}
 		mu.Lock()
-		mode := result.WAF.Mode
-		if mode == "" {
-			mode = "off"
-		}
-		packages := make([]WafPackage, 0, len(resp.Data))
-		for _, pkg := range resp.Data {
-			status := "disabled"
-			enabled := false
-			if pkg.IsEnabled != nil && *pkg.IsEnabled {
-				status = "enabled"
-				enabled = true
-			}
-			packages = append(packages, WafPackage{
-				ID:      pkg.ID,
-				Name:    pkg.Name,
-				Mode:    mode,
-				Status:  status,
-				Enabled: enabled,
-			})
-		}
-		result.WAF.PackageCount = len(packages)
-		result.WAF.Packages = packages
+		result.WAF = *waf
 		mu.Unlock()
 		return nil
 	})

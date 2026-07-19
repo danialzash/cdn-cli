@@ -23,8 +23,10 @@ var (
 
 func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:   "verge",
-		Short: "VergeCloud CDN CLI",
+		Use:           "verge",
+		Short:         "VergeCloud CDN CLI",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		Long: `verge is a command-line interface for the VergeCloud CDN API.
 
 Configuration is stored in ~/.config/vergecloud/config.yaml.
@@ -40,7 +42,7 @@ GETTING STARTED
 COMMAND GROUPS
 
   auth              Login, logout, and check authentication status
-  domains           List, get, and inspect domains
+  domains           List, get, inspect, and diagnose domains
   dns               List, add, update, delete, and verify DNS records
   firewall          Manage firewall rules (list, get, add, update, delete)
   page-rules        Manage page rules

@@ -9,13 +9,16 @@ import (
 )
 
 type Result struct {
-	RecordID string `json:"record_id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Expected string `json:"expected"`
-	Actual   string `json:"actual"`
-	Status   string `json:"status"`
-	Detail   string `json:"detail,omitempty"`
+	RecordID       string `json:"record_id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	Expected       string `json:"expected"`
+	Actual         string `json:"actual"`
+	Status         string `json:"status"`
+	Detail         string `json:"detail,omitempty"`
+	Cloud          bool   `json:"cloud,omitempty"`
+	CloudWeak      bool   `json:"cloud_weak,omitempty"`
+	MailCloudProxy bool   `json:"mail_cloud_proxy,omitempty"`
 }
 
 type Checker struct {
@@ -84,7 +87,7 @@ func (c *Checker) verifyHost(ctx context.Context, result Result, queryName, reco
 			filtered = append(filtered, parsed.String())
 		}
 	}
-		sort.Strings(filtered)
+	sort.Strings(filtered)
 	result.Actual = strings.Join(filtered, ", ")
 
 	if len(filtered) == 0 {
