@@ -4,7 +4,7 @@ A command-line interface for the [VergeCloud CDN API](https://api.vergecloud.dev
 
 Manage domains, DNS, SSL, cache, firewall, WAF, analytics, and more from your terminal.
 
-**Current version:** v0.3.0
+**Current version:** v0.4.0
 
 ## Features
 
@@ -23,10 +23,10 @@ Manage domains, DNS, SSL, cache, firewall, WAF, analytics, and more from your te
 **Linux / macOS:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/vergecloud/cdn-cli/main/scripts/install.sh | sh
 ```
 
-Manual download: [GitHub Releases](https://github.com/danialzash/cdn-cli/releases)
+Manual download: [GitHub Releases](https://github.com/vergecloud/cdn-cli/releases)
 
 ## Quick start
 

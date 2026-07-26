@@ -13,26 +13,26 @@ No runtime dependencies — downloads a pre-built binary from GitHub Releases.
 **Linux / macOS:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/vergecloud/cdn-cli/main/scripts/install.sh | sh
 ```
 
 Install to a custom directory:
 
 ```bash
-INSTALL_DIR=~/bin curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
+INSTALL_DIR=~/bin curl -fsSL https://raw.githubusercontent.com/vergecloud/cdn-cli/main/scripts/install.sh | sh
 ```
 
 Pin a specific release:
 
 ```bash
-VERSION=v0.3.0 curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
+VERSION=v0.4.0 curl -fsSL https://raw.githubusercontent.com/vergecloud/cdn-cli/main/scripts/install.sh | sh
 ```
 
 The install script verifies SHA256 checksums and installs man pages when available.
 
 ### Manual download
 
-Download the archive for your platform from [GitHub Releases](https://github.com/danialzash/cdn-cli/releases):
+Download the archive for your platform from [GitHub Releases](https://github.com/vergecloud/cdn-cli/releases):
 
 | Platform | Archive |
 |----------|---------|
@@ -44,7 +44,7 @@ Download the archive for your platform from [GitHub Releases](https://github.com
 
 ```bash
 # Linux example
-curl -LO https://github.com/danialzash/cdn-cli/releases/latest/download/verge_linux_amd64.tar.gz
+curl -LO https://github.com/vergecloud/cdn-cli/releases/latest/download/verge_linux_amd64.tar.gz
 tar -xzf verge_linux_amd64.tar.gz
 sudo mv verge /usr/local/bin/   # or mv verge ~/bin/
 ```

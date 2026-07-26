@@ -9,7 +9,7 @@ Build, test, extend, and release the VergeCloud CDN CLI.
 ## Build from source
 
 ```bash
-git clone https://github.com/danialzash/cdn-cli.git
+git clone https://github.com/vergecloud/cdn-cli.git
 cd cdn-cli
 make build
 ./bin/verge version
@@ -132,11 +132,11 @@ GoReleaser runs `go run ./cmd/gendocs` before each release build, so published a
    git tag v0.3.0
    git push origin v0.3.0
    ```
-3. GitHub Actions runs GoReleaser and publishes binaries to [GitHub Releases](https://github.com/danialzash/cdn-cli/releases).
+3. GitHub Actions runs GoReleaser and publishes binaries to [GitHub Releases](https://github.com/vergecloud/cdn-cli/releases).
 
 **You do not need GoReleaser installed locally.** Pushing the tag is enough — CI builds and publishes everything.
 
-Check progress at: `https://github.com/danialzash/cdn-cli/actions`
+Check progress at: `https://github.com/vergecloud/cdn-cli/actions`
 
 ### Optional: test release build locally
 

@@ -64,9 +64,9 @@ func newGettingStartedCmd() *cobra.Command {
 
 INSTALL
 
-  curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/vergecloud/cdn-cli/main/scripts/install.sh | sh
 
-  Or download from: https://github.com/danialzash/cdn-cli/releases
+  Or download from: https://github.com/vergecloud/cdn-cli/releases
 
 UPDATE
 

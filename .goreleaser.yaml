@@ -57,7 +57,7 @@ changelog:
 
 release:
   github:
-    owner: danialzash
+    owner: vergecloud
     name: cdn-cli
   draft: false
   prerelease: auto

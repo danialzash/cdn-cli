@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
 # Install verge CLI from GitHub Releases.
-# Usage: curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/vergecloud/cdn-cli/main/scripts/install.sh | sh
 
 set -e
 
-REPO="danialzash/cdn-cli"
+REPO="vergecloud/cdn-cli"
 BINARY="verge"
 INSTALL_DIR="${INSTALL_DIR:-}"
 MAN_DIR="${MAN_DIR:-}"

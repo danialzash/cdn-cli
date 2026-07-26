@@ -36,9 +36,9 @@ func GettingStartedGuide() string {
 
 INSTALL
 
-  curl -fsSL https://raw.githubusercontent.com/danialzash/cdn-cli/main/scripts/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/vergecloud/cdn-cli/main/scripts/install.sh | sh
 
-  Manual download: https://github.com/danialzash/cdn-cli/releases
+  Manual download: https://github.com/vergecloud/cdn-cli/releases
 
 UPDATE
 
